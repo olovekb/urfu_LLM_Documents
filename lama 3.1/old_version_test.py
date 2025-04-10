@@ -20,7 +20,7 @@ CONFIG = {
     "model_name": "llama3.1",
     "max_tokens": 300,
     "chunksize": 50,
-    "flexible_config": {"temperature": 0.3, "top_p": 0.9, "frequency_penalty": 0.1},
+    "flexible_config": {"temperature": 0.2, "top_p": 0.9, "frequency_penalty": 0.1},
     "file_paths": {
         "pdf": "urfu_LLM_Documents/lama 3.1/Копейск Фин. управление оп 2 лс.pdf",
         "csv": "urfu_LLM_Documents/lama 3.1/FINAL_CLEANED_SP3.csv",
@@ -28,68 +28,58 @@ CONFIG = {
 }
 
 PROMPT_TEMPLATE = """
-ТОЧНО СРАВНИТЕ ОБА ПАРАМЕТРА ПОСЛЕДОВАТЕЛЬНО:
+Сравните смысловое содержание двух пар текстов, учитывая ОБА параметра:
+1. Архивные данные
+2. Наименование
 
-ШАГ 1: Сравните АРХИВНЫЕ ДАННЫЕ
-- Нормализуйте оба значения: игнорируйте регистр, пунктуацию, пробелы, окончания и порядок слов
-- Определите: сохраняется ли основной смысл после нормализации?
+Игнорируйте:
+- Регистр букв
+- Пунктуацию и пробелы
+- Окончания слов
+- Порядок слов
+- Наличие дополнительных слов
 
-ШАГ 2: Сравните НАИМЕНОВАНИЯ
-- Нормализуйте оба значения аналогично первому шагу
-- Проверьте: остаются ли ключевые смысловые элементы идентичными?
+Данные из документа:
+1. Архив: {pdf_archive}
+2. Наименование: {pdf_name}
 
-ФИНАЛЬНОЕ РЕШЕНИЕ (ВЫБЕРИТЕ ТОЛЬКО ОДИН ОТВЕТ):
-- "Совпадение найдено" — ЕСЛИ ОБА ПАРАМЕТРА (архив И наименование) ИМЕЮТ СМЫСЛОВОЕ ЕДИНСТВО ПОСЛЕ НОРМАЛИЗАЦИИ
-- "Совпадение не найдено" — ЕСЛИ ЛЮБОЙ ИЗ ПАРАМЕТРОВ (хотя бы один) ИМЕЕТ ОТЛИЧИЯ В ОСНОВНОМ СОДЕРЖАНИИ
+Данные из базы:
+1. Архив: {csv_archive}
+2. Наименование: {csv_name}
 
-Примеры:
-1. PDF Архив: "Арх. 2023-дел/45", CSV Архив: "2023 дел 45" → СОВПАДАЕТ
-   PDF Наименование: "Отчет финансовый", CSV: "финансовый отчет" → СОВПАДАЕТ
-   >>> ОБЩИЙ РЕЗУЛЬТАТ: Совпадение найдено
-
-2. PDF Архив: "ЛД-2024/7", CSV Архив: "ЛД 2024/8" → НЕ СОВПАДАЕТ 
-   (даже если наименования совпадают) 
-   >>> ОБЩИЙ РЕЗУЛЬТАТ: Совпадение не найдено
-
-Данные для сравнения:
-PDF Архив: {pdf_archive}
-PDF Наименование: {pdf_name}
-CSV Архив: {csv_archive}
-CSV Наименование: {csv_name}
-
-Ответьте СТРОГО ОДНОЙ ФРАЗОЙ БЕЗ ДОПОЛНЕНИЙ:
-- Совпадение найдено
-- Совпадение не найдено
+Ответьте ТОЛЬКО одной из фраз:
+- Совпадение найдено (если совпадают ОБА параметра)
+- Совпадение не найдено (если не совпадает ХОТЯ БЫ ОДИН параметр)
 """
 
 
 def extract_pdf_data(pdf_path: str) -> Optional[Tuple[str, str]]:
-    """Корректно разделяет архив и наименование по структурным признакам."""
+    """Извлекает данные из первой страницы PDF после предложения с архивом."""
     try:
-        with fitz.open(pdf_path) as doc:
-            full_text = " ".join(page.get_text("text") for page in doc)
+        if not os.path.exists(pdf_path):
+            raise FileNotFoundError(f"PDF файл не существует: {pdf_path}")
 
-            # 1. Находим ядро архивной записи
-            archive_core_pattern = re.compile(
-                r"(Архивный отдел\b[\s\S]*?)(?=\s{3,}|\n\s*[А-ЯЁ]|$)",
-                re.IGNORECASE | re.DOTALL,
+        with fitz.open(pdf_path) as doc:
+            # Работаем только с первой страницей
+            first_page = doc[0]
+            page_text = first_page.get_text("text")
+
+            # Улучшенный паттерн для поиска архивных данных
+            archive_pattern = re.compile(
+                r"(?i)(Архив[^\n]*?)[:—\s]+([^\n]+?)(?=\n\s*[А-ЯA-Z]|$)",
+                flags=re.DOTALL,
             )
 
-            archive_match = archive_core_pattern.search(full_text)
-            if not archive_match:
-                return None
+            if match := archive_pattern.search(page_text):
+                archive_value = match.group(2).strip()
 
-            # 2. Извлекаем полный текст архива
-            archive_value = archive_match.group(1)
-            archive_value = re.sub(r"\s+", " ", archive_value).strip()
+                # Извлекаем следующий значимый текст после архива как наименование
+                remaining_text = page_text[match.end() :]
+                name_value = re.search(r"\n\s*([^\n]+)", remaining_text)
 
-            # Извлекаем следующий значимый текст после архива как наименование
-            remaining_text = full_text[archive_match.end() :]
-            name_value = re.search(r"\n\s*([^\n]+)", remaining_text)
-
-            if name_value:
-                name = re.sub(r"\s+", " ", name_value.group(1)).strip()
-                return archive_value, name
+                if name_value:
+                    name = re.sub(r"\s+", " ", name_value.group(1)).strip()
+                    return archive_value, name
 
         logger.warning("Не удалось извлечь данные из первой страницы PDF")
         return None
