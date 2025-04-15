@@ -17,13 +17,13 @@ logger = logging.getLogger(__name__)
 
 # Конфигурация
 CONFIG = {
-    "model_name": "llama3.1",
+    "model_name": "llama3.2",
     "max_tokens": 300,
     "chunksize": 50,
     "flexible_config": {"temperature": 0.3, "top_p": 0.9, "frequency_penalty": 0.1},
     "file_paths": {
-        "pdf": "urfu_LLM_Documents/lama 3.1/Копейск Фин. управление оп 2 лс.pdf",
-        "csv": "urfu_LLM_Documents/lama 3.1/FINAL_CLEANED_SP3.csv",
+        "pdf": "./Копейск Фин. управление оп 2 лс.pdf",
+        "csv": "./FINAL_CLEANED_SP3.csv",
     },
 }
 
@@ -135,8 +135,8 @@ def compare_texts_with_llama(
         return "error"
 
 
+"""Обрабатывает чанк CSV с проверкой обоих параметров"""
 def process_csv_chunk(chunk: pd.DataFrame, pdf_data: Tuple[str, str]) -> bool:
-    """Обрабатывает чанк CSV с проверкой обоих параметров."""
     required_columns = {"Архив", "Наименование"}
     if not required_columns.issubset(chunk.columns):
         raise ValueError("Отсутствуют необходимые столбцы в CSV")
@@ -176,17 +176,17 @@ def process_csv_chunk(chunk: pd.DataFrame, pdf_data: Tuple[str, str]) -> bool:
 
     return False
 
-
-def find_matches(pdf_path: str, csv_path: str) -> bool:
-    """Основная функция для поиска совпадений.
+"""
+    Основная функция для поиска совпадений
 
     Args:
         pdf_path: Путь к PDF файлу
         csv_path: Путь к CSV файлу
-
+        
     Returns:
         True если найдено хотя бы одно совпадение, иначе False
     """
+def find_matches(pdf_path: str, csv_path: str) -> bool:
     try:
         # Проверка существования файлов
         if not os.path.exists(pdf_path):
