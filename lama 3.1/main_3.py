@@ -1,25 +1,30 @@
 import os
 import csv
-from langchain_community.document_loaders import PyPDFLoader
-from langchain_community.vectorstores import FAISS
-from langchain_ollama.embeddings import OllamaEmbeddings
+import fitz
 from langchain_ollama.chat_models import ChatOllama
-from langchain.chains import RetrievalQA
 
 class PDFChecker:
     def __init__(self):
-        self.model_name = "llama3.2"
-        self.embed_model = "nomic-embed-text"
+        self.model_name = "mistral"
 
-    def analyze(self, pdf_path, prompt):
-        pages = self.load_pdf(pdf_path)
-        db = self.create_vector_db(pages)
+    def extract_text_with_fitz(self, pdf_path):
+        full_text = ""
+        doc = fitz.open(pdf_path)
+        for page_num, page in enumerate(doc):
+            blocks = page.get_text("blocks")  # list of (x0, y0, x1, y1, "text", block_no, block_type)
+            sorted_blocks = sorted(blocks, key=lambda b: (round(b[1]), round(b[0])))
+            for block in sorted_blocks:
+                text = block[4].strip()
+                if text:
+                    full_text += text + "\n"
+        return full_text
+
+    def analyze(self, text, prompt):
         llm = ChatOllama(model=self.model_name)
-        qa = RetrievalQA.from_chain_type(llm=llm, retriever=db.as_retriever())
+        response = llm.invoke(f"{prompt}\n\nВот содержимое таблиц из PDF:\n{text}")
+        return response["message"]["content"] if isinstance(response, dict) else str(response)
 
-        return qa.invoke(prompt)
-
-    def analyze_dir(self, dir_path, prompt_path, output_dir_path = None):
+    def analyze_dir(self, dir_path, prompt_path, output_dir_path=None):
         if output_dir_path is None:
             output_dir_path = dir_path
 
@@ -34,11 +39,16 @@ class PDFChecker:
                 print(f"\nОбработка {pdf_path}")
 
                 try:
-                    result = self.analyze(pdf_path, prompt)
-                    result_text = result["result"] if isinstance(result, dict) and "result" in result else str(result)
+                    text = self.extract_text_with_fitz(pdf_path)
+                    if not text.strip():
+                        print(f"✗ Не удалось извлечь текст из {filename}")
+                        continue
+
+                    result_text = self.analyze(text, prompt)
 
                     print(f"\n✓ Результат:\n\n{result_text}")
 
+                    # Сохраняем CSV, если структура похожа на таблицу
                     if "|" in result_text and result_text.count("\n") > 3:
                         lines = [line.strip() for line in result_text.split("\n") if line.strip().startswith("|")]
                         if len(lines) >= 3:
@@ -48,25 +58,15 @@ class PDFChecker:
                                 for row in lines[2:]
                             ]
                             csv_filename = os.path.splitext(filename)[0] + ".csv"
-                            output_path = os.path.abspath(os.path.join(output_dir_path, csv_filename))
-                            with open(output_path, "w", newline="", encoding="utf-8") as f:
+                            output_csv_path = os.path.join(output_dir_path, csv_filename)
+                            with open(output_csv_path, "w", newline="", encoding="utf-8") as f:
                                 writer = csv.writer(f)
                                 writer.writerow(headers)
                                 writer.writerows(data)
 
-                            print(f"\n✓ Результат сохранён в {output_path}")
+                            print(f"✓ CSV сохранён в {output_csv_path}")
                 except Exception as e:
                     print(f"\n✗ Ошибка при обработке {filename}: {e}")
-
-    def load_pdf(self, pdf_path):
-        loader = PyPDFLoader(pdf_path)
-
-        return loader.load_and_split()
-
-    def create_vector_db(self, pages):
-        embedding = OllamaEmbeddings(model=self.embed_model)
-
-        return FAISS.from_documents(pages, embedding)
 
 def main():
     checker = PDFChecker()

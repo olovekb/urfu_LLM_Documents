@@ -1,25 +1,30 @@
 import os
 import csv
-from langchain_community.document_loaders import PyPDFLoader
-from langchain_community.vectorstores import FAISS
-from langchain_ollama.embeddings import OllamaEmbeddings
+import pdfplumber
 from langchain_ollama.chat_models import ChatOllama
-from langchain.chains import RetrievalQA
 
 class PDFChecker:
     def __init__(self):
         self.model_name = "llama3.2"
-        self.embed_model = "nomic-embed-text"
 
-    def analyze(self, pdf_path, prompt):
-        pages = self.load_pdf(pdf_path)
-        db = self.create_vector_db(pages)
+    def extract_text_with_tables(self, pdf_path):
+        full_text = ""
+        with pdfplumber.open(pdf_path) as pdf:
+            for page in pdf.pages:
+                tables = page.extract_tables()
+                for table in tables:
+                    for row in table:
+                        if row:
+                            full_text += " | ".join(str(cell).strip() if cell else "" for cell in row) + "\n"
+
+        return full_text
+
+    def analyze(self, text, prompt):
         llm = ChatOllama(model=self.model_name)
-        qa = RetrievalQA.from_chain_type(llm=llm, retriever=db.as_retriever())
 
-        return qa.invoke(prompt)
+        return llm.invoke(f"{prompt}\n\nВот содержимое таблиц из PDF:\n{text}")
 
-    def analyze_dir(self, dir_path, prompt_path, output_dir_path = None):
+    def analyze_dir(self, dir_path, prompt_path, output_dir_path=None):
         if output_dir_path is None:
             output_dir_path = dir_path
 
@@ -34,11 +39,17 @@ class PDFChecker:
                 print(f"\nОбработка {pdf_path}")
 
                 try:
-                    result = self.analyze(pdf_path, prompt)
+                    text = self.extract_text_with_tables(pdf_path)
+                    if not text.strip():
+                        print(f"✗ Таблицы не найдены в {filename}")
+                        continue
+
+                    result = self.analyze(text, prompt)
                     result_text = result["result"] if isinstance(result, dict) and "result" in result else str(result)
 
                     print(f"\n✓ Результат:\n\n{result_text}")
 
+                    # Если это таблица в markdown — сохраняем как .csv
                     if "|" in result_text and result_text.count("\n") > 3:
                         lines = [line.strip() for line in result_text.split("\n") if line.strip().startswith("|")]
                         if len(lines) >= 3:
@@ -48,25 +59,15 @@ class PDFChecker:
                                 for row in lines[2:]
                             ]
                             csv_filename = os.path.splitext(filename)[0] + ".csv"
-                            output_path = os.path.abspath(os.path.join(output_dir_path, csv_filename))
-                            with open(output_path, "w", newline="", encoding="utf-8") as f:
+                            output_csv_path = os.path.join(output_dir_path, csv_filename)
+                            with open(output_csv_path, "w", newline="", encoding="utf-8") as f:
                                 writer = csv.writer(f)
                                 writer.writerow(headers)
                                 writer.writerows(data)
 
-                            print(f"\n✓ Результат сохранён в {output_path}")
+                            print(f"✓ CSV сохранён в {output_csv_path}")
                 except Exception as e:
                     print(f"\n✗ Ошибка при обработке {filename}: {e}")
-
-    def load_pdf(self, pdf_path):
-        loader = PyPDFLoader(pdf_path)
-
-        return loader.load_and_split()
-
-    def create_vector_db(self, pages):
-        embedding = OllamaEmbeddings(model=self.embed_model)
-
-        return FAISS.from_documents(pages, embedding)
 
 def main():
     checker = PDFChecker()
