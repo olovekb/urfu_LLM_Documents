@@ -1,7 +1,12 @@
+
 import re
 import fitz  # PyMuPDF
+from sentence_transformers import SentenceTransformer, util
+import numpy as np
 
-# Функция для извлечения текста из PDF
+# Загрузка модели эмбеддингов
+model = SentenceTransformer('paraphrase-MiniLM-L6-v2')
+
 def extract_pdf_text(file_path):
     doc = fitz.open(file_path)
     text = ""
@@ -9,73 +14,53 @@ def extract_pdf_text(file_path):
         text += page.get_text("text")
     return text
 
-# Функция для извлечения наименования организации, игнорируя должность и ФИО
-def extract_organization_name(name):
-    if name:
-        # Паттерн для поиска наименования организации в кавычках
-        pattern = r"«([^\»]+)»"  # Находим текст в кавычках
-        match = re.search(pattern, name)
-        if match:
-            return re.sub(r'\s+', ' ', match.group(1).strip())  # Убираем лишние пробелы
+def preprocess_text(text):
+    text = re.sub(r"_+", " ", text)
+    text = re.sub(r"От\s*\d{1,2}\.\d{1,2}\.\d{4}", "", text)
+    text = re.sub(r"\d{1,2}\.\d{1,2}\.\d{4}", "", text)
+    return text.strip()
+
+def extract_agreed_name(text):
+    pattern_agreed = (
+        r"СОГЛАСОВАНО\s*(?:Протокол\s*ЭК\s*)?"
+        r"(.*?)"
+        r"(?=\s*[А-ЯЁ]\.[А-ЯЁ]\.\s*[А-ЯЁа-яё-]+|\bОт\b|\d{1,2}[./-]\d{1,2}[./-]\d{2,4})"
+    )
+    match = re.search(pattern_agreed, text, re.DOTALL)
+    if match:
+        return match.group(1).strip()
     return None
 
-# Функция для извлечения наименования и ФИО из блоков СОГЛАСОВАНО и УТВЕРЖДАЮ
-def extract_agreed_and_approved_names(text):
-    # Паттерны для блоков СОГЛАСОВАНО и УТВЕРЖДАЮ с использованием универсального паттерна для ФИО
-    pattern_agreed = r"СОГЛАСОВАНО\s*(.*?)([А-ЯЁ][a-яё]+\s[А-ЯЁ]\.[А-ЯЁ]\.)"  # ФИО: Фамилия И. И.
-    pattern_approved = r"УТВЕРЖДАЮ\s*(.*?)([А-ЯЁ][a-яё]+\s[А-ЯЁ]\.[А-ЯЁ]\.)"  # ФИО: Фамилия И. И.
-    
-    # Поиск с использованием регулярных выражений
-    согласовано_name_match = re.search(pattern_agreed, text, re.DOTALL)
-    утверждаю_name_match = re.search(pattern_approved, text, re.DOTALL)
-    
-    # Если найдено совпадение, извлекаем наименование и ФИО
-    if согласовано_name_match:
-        согласовано_name = согласовано_name_match.group(1).strip() + " " + согласовано_name_match.group(2).strip()
-    else:
-        согласовано_name = None
-    
-    if утверждаю_name_match:
-        утверждаю_name = утверждаю_name_match.group(1).strip() + " " + утверждаю_name_match.group(2).strip()
-    else:
-        утверждаю_name = None
-    
-    return согласовано_name, утверждаю_name
+def extract_approved_name(text):
+    pattern_approved = r"УТВЕРЖДАЮ\s*(.*?)(?:\s*[А-ЯЁ][а-яё]+\s[А-ЯЁ]\.\s*[А-ЯЁ]\.|(?:\d{4}\s*год))"
+    match = re.search(pattern_approved, text, re.DOTALL)
+    if match:
+        return match.group(1).strip()
+    return None
 
-# Функция для сравнения наименований
-def compare_names(согласовано_name, утверждаю_name):
-    # Проверяем, что имена не пустые
-    if согласовано_name and утверждаю_name:
-        # Извлекаем названия организации из обоих строк
-        согласовано_organization = extract_organization_name(согласовано_name)
-        утверждаю_organization = extract_organization_name(утверждаю_name)
-        
-        # Проверяем, совпадают ли наименования
-        if согласовано_organization and утверждаю_organization:
-            if согласовано_organization == утверждаю_organization:
-                return "Наименования совпадают"
-            else:
-                # Добавляем вывод различий для лучшего понимания
-                return f"Наименования не совпадают: {согласовано_organization} != {утверждаю_organization}"
+def compare_names(agreed, approved):
+    if agreed and approved:
+        agreed_vec = model.encode(preprocess_text(agreed), convert_to_tensor=True)
+        approved_vec = model.encode(preprocess_text(approved), convert_to_tensor=True)
+        similarity = util.pytorch_cos_sim(agreed_vec, approved_vec).item()
+        if similarity > 0.8:
+            return "Наименования совпадают", similarity
         else:
-            return "Ошибка: Не удалось извлечь наименования"
+            return "Наименования не совпадают", similarity
     else:
-        return "Ошибка: Не удалось извлечь наименования из блоков СОГЛАСОВАНО или УТВЕРЖДАЮ"
+        return "Ошибка: Не удалось извлечь наименования", None
 
-# Основная функция
 def main(pdf_path):
     text = extract_pdf_text(pdf_path)
-    согласовано_name, утверждаю_name = extract_agreed_and_approved_names(text)
-    
-    # Сравнение наименований
-    result = compare_names(согласовано_name, утверждаю_name)
-    return согласовано_name, утверждаю_name, result
+    agreed = extract_agreed_name(text)
+    approved = extract_approved_name(text)
+    result, sim = compare_names(agreed, approved)
+    return agreed, approved, result, sim
 
-# Пример использования
-pdf_path = "G:\\Python\\urfu_LLM_documents\\lama 3.1\\proverka8\\data\\Касли Больница оп 1 пост хр.pdf"  
-согласовано_name, утверждаю_name, result = main(pdf_path)
-
-# Выводим результат
-print(f"Согласовано name: {согласовано_name}")
-print(f"Утверждаю name: {утверждаю_name}")
-print(f"Результат сравнения: {result}")
+# Пример использования:
+if __name__ == "__main__":
+    pdf_path = "G:\\Python\\urfu_LLM_documents\\lama 3.1\\proverka8\\data\\СП_16_Магнит_отдел_Выборы_Гос_Дума_2016_оп_2_п_хр_.pdf"
+    agreed, approved, result, sim = main(pdf_path)
+    print(f"Согласовано: {agreed}\n")
+    print(f"Утверждаю: {approved}\n")
+    print(f"{result} (сходство: {sim})")
