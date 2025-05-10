@@ -1,12 +1,11 @@
-
 import re
 import fitz  # PyMuPDF
 from sentence_transformers import SentenceTransformer, util
-import numpy as np
 
 # Загрузка модели эмбеддингов
 model = SentenceTransformer('paraphrase-MiniLM-L6-v2')
 
+# Извлечение текста из PDF
 def extract_pdf_text(file_path):
     doc = fitz.open(file_path)
     text = ""
@@ -14,12 +13,14 @@ def extract_pdf_text(file_path):
         text += page.get_text("text")
     return text
 
+# Предобработка текста
 def preprocess_text(text):
     text = re.sub(r"_+", " ", text)
     text = re.sub(r"От\s*\d{1,2}\.\d{1,2}\.\d{4}", "", text)
     text = re.sub(r"\d{1,2}\.\d{1,2}\.\d{4}", "", text)
     return text.strip()
 
+# Извлечение из блока СОГЛАСОВАНО
 def extract_agreed_name(text):
     pattern_agreed = (
         r"СОГЛАСОВАНО\s*(?:Протокол\s*ЭК\s*)?"
@@ -27,40 +28,47 @@ def extract_agreed_name(text):
         r"(?=\s*[А-ЯЁ]\.[А-ЯЁ]\.\s*[А-ЯЁа-яё-]+|\bОт\b|\d{1,2}[./-]\d{1,2}[./-]\d{2,4})"
     )
     match = re.search(pattern_agreed, text, re.DOTALL)
-    if match:
-        return match.group(1).strip()
-    return None
+    return match.group(1).strip() if match else None
 
+# Извлечение из блока УТВЕРЖДАЮ
 def extract_approved_name(text):
-    pattern_approved = r"УТВЕРЖДАЮ\s*(.*?)(?:\s*[А-ЯЁ][а-яё]+\s[А-ЯЁ]\.\s*[А-ЯЁ]\.|(?:\d{4}\s*год))"
+    pattern_approved = (
+        r"УТВЕРЖДАЮ\s*"
+        r"(.*?)"
+        r"(?=\s*[А-ЯЁ]\.[А-ЯЁ]\.\s*[А-ЯЁа-яё-]+|\d{4}\s*год|\d{1,2}[./-]\d{1,2}[./-]\d{2,4})"
+    )
     match = re.search(pattern_approved, text, re.DOTALL)
-    if match:
-        return match.group(1).strip()
-    return None
+    return match.group(1).strip() if match else None
 
-def compare_names(agreed, approved):
-    if agreed and approved:
-        agreed_vec = model.encode(preprocess_text(agreed), convert_to_tensor=True)
-        approved_vec = model.encode(preprocess_text(approved), convert_to_tensor=True)
-        similarity = util.pytorch_cos_sim(agreed_vec, approved_vec).item()
-        if similarity > 0.8:
-            return "Наименования совпадают", similarity
+# Сравнение с использованием эмбеддингов напрямую
+def compare_names_with_embeddings(name1, name2, threshold=0.8):
+    if name1 and name2:
+        name1_clean = preprocess_text(name1)
+        name2_clean = preprocess_text(name2)
+        emb1 = model.encode(name1_clean, convert_to_tensor=True)
+        emb2 = model.encode(name2_clean, convert_to_tensor=True)
+        similarity = util.pytorch_cos_sim(emb1, emb2).item()
+
+        if similarity >= threshold:
+            return f"Наименования совпадают (сходство: {similarity:.2f})"
         else:
-            return "Наименования не совпадают", similarity
+            return f"Наименования не совпадают (сходство: {similarity:.2f})"
     else:
-        return "Ошибка: Не удалось извлечь наименования", None
+        return "Ошибка: Не удалось извлечь наименования"
 
+# Основная логика
 def main(pdf_path):
     text = extract_pdf_text(pdf_path)
-    agreed = extract_agreed_name(text)
-    approved = extract_approved_name(text)
-    result, sim = compare_names(agreed, approved)
-    return agreed, approved, result, sim
+    agreed_name = extract_agreed_name(text)
+    approved_name = extract_approved_name(text)
+    result = compare_names_with_embeddings(agreed_name, approved_name)
+    return agreed_name, approved_name, result
 
-# Пример использования:
-if __name__ == "__main__":
-    pdf_path = "G:\\Python\\urfu_LLM_documents\\lama 3.1\\proverka8\\data\\СП_16_Магнит_отдел_Выборы_Гос_Дума_2016_оп_2_п_хр_.pdf"
-    agreed, approved, result, sim = main(pdf_path)
-    print(f"Согласовано: {agreed}\n")
-    print(f"Утверждаю: {approved}\n")
-    print(f"{result} (сходство: {sim})")
+# Пример
+pdf_path = "G:\\Python\\urfu_LLM_documents\\lama 3.1\\proverka8\\data\\Куса.отд.архитектуры.оп1пх.2022.pdf"
+agreed_name, approved_name, result = main(pdf_path)
+
+# Вывод
+print(f"Согласовано name: {agreed_name}")
+print(f"Утверждаю name: {approved_name}")
+print(f"Результат сравнения: {result}")
