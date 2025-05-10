@@ -1,5 +1,0 @@
-# fastapi: localhost:8015 # адрес сервиса api 
-fastapi: "http://212.193.88.193:9005"
-# root_path: "http://parser-project-urfu.ru/archivep_api/" #корневой путь для сайта в FastApi
-root_path: ""
-local: False
