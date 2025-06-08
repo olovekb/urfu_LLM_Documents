@@ -4,6 +4,8 @@ import pytesseract
 import poppler
 import fitz  # PyMuPDF
 import os
+import numpy as np
+from certifi import where
 from pdf2image import convert_from_path
 from sentence_transformers import SentenceTransformer, util
 
@@ -47,15 +49,44 @@ def deleteFileInFolder(file_path = 'D:\\OlegDocAnalyze\\fork_urfu_LLM_DOC\\urfu_
             print(f'Ошибка при удалении файла {file_path}. {e}')
 
 #Анализ страницы
-def analyzeImages(images_path = 'D:\\OlegDocAnalyze\\fork_urfu_LLM_DOC\\urfu_LLM_Documents\\lama 3.1\\proverka8\\data\\pdf_images'):
+def analyzeImages(images_path = 'D:\\OlegDocAnalyze\\fork_urfu_LLM_DOC\\urfu_LLM_Documents\\lama 3.1\\proverka8\\data\\pdf_images', template_path = 'D:\\OlegDocAnalyze\\fork_urfu_LLM_DOC\\urfu_LLM_Documents\\lama 3.1\\proverka8\\data\\template_images'):
     pytesseract.pytesseract.tesseract_cmd = 'D:\\OlegDocAnalyze\\fork_urfu_LLM_DOC\\urfu_LLM_Documents\\lama 3.1\\Tesseract\\tesseract.exe'
+
+    template_array = []
+    for j in range(1,len(os.listdir(template_path)) + 1):
+        img = cv2.imread(
+            f'D:\\OlegDocAnalyze\\fork_urfu_LLM_DOC\\urfu_LLM_Documents\\lama 3.1\\proverka8\\data\\template_images\\page_{j}.png')
+        template_array.append(img)
+
+    results_array = []
 
     #Открываем контекст одной страницы
     for i in range(1, len(os.listdir(images_path)) + 1):
         img = cv2.imread(f'D:\\OlegDocAnalyze\\fork_urfu_LLM_DOC\\urfu_LLM_Documents\\lama 3.1\\proverka8\\data\\pdf_images\\page_{i}.jpg')
-        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        for template in template_array:
+            gray_main = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+            gray_template = cv2.cvtColor(template, cv2.COLOR_BGR2GRAY)
 
-        print(pytesseract.image_to_string(img, lang='rus'))
+            # Шаг 4: Сопоставление шаблонов
+            result = cv2.matchTemplate(gray_main, gray_template, cv2.TM_CCOEFF)
+
+            # Шаг 5: Поиск лучшего совпадения
+            min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(result)
+            best_match_location = max_loc
+
+            # Шаг 6: Отрисовка прямоугольника
+            h, w = gray_template.shape
+            bottom_right = (best_match_location[0] + w, best_match_location[1] + h)
+            cv2.rectangle(img, best_match_location, bottom_right, (0, 255, 0), 2)
+
+            # Шаг 7: Отображение результата
+            cv2.imshow('Результат', img)
+            cv2.waitKey(0)
+            cv2.destroyAllWindows()
+
+        #print(pytesseract.image_to_string(img, lang='rus'))
+
+
 
 
 # Основная логика
