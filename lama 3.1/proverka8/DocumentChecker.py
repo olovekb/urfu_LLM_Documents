@@ -1,44 +1,15 @@
 import re
+import cv2
+import pytesseract
+import poppler
 import fitz  # PyMuPDF
+import os
+from pdf2image import convert_from_path
 from sentence_transformers import SentenceTransformer, util
 
+"""
 # Загрузка модели эмбеддингов
 model = SentenceTransformer('paraphrase-MiniLM-L6-v2')
-
-# Извлечение текста из PDF
-def extract_pdf_text(file_path):
-    doc = fitz.open(file_path)
-    text = ""
-    for page in doc:
-        text += page.get_text("text")
-    return text
-
-# Предобработка текста
-def preprocess_text(text):
-    text = re.sub(r"_+", " ", text)
-    text = re.sub(r"От\s*\d{1,2}\.\d{1,2}\.\d{4}", "", text)
-    text = re.sub(r"\d{1,2}\.\d{1,2}\.\d{4}", "", text)
-    return text.strip()
-
-# Извлечение из блока СОГЛАСОВАНО
-def extract_agreed_name(text):
-    pattern_agreed = (
-        r"СОГЛАСОВАНО\s*(?:Протокол\s*ЭК\s*)?"
-        r"(.*?)"
-        r"(?=\s*[А-ЯЁ]\.[А-ЯЁ]\.\s*[А-ЯЁа-яё-]+|\bОт\b|\d{1,2}[./-]\d{1,2}[./-]\d{2,4})"
-    )
-    match = re.search(pattern_agreed, text, re.DOTALL)
-    return match.group(1).strip() if match else None
-
-# Извлечение из блока УТВЕРЖДАЮ
-def extract_approved_name(text):
-    pattern_approved = (
-        r"УТВЕРЖДАЮ\s*"
-        r"(.*?)"
-        r"(?=\s*[А-ЯЁ]\.[А-ЯЁ]\.\s*[А-ЯЁа-яё-]+|\d{4}\s*год|\d{1,2}[./-]\d{1,2}[./-]\d{2,4})"
-    )
-    match = re.search(pattern_approved, text, re.DOTALL)
-    return match.group(1).strip() if match else None
 
 # Сравнение с использованием эмбеддингов напрямую
 def compare_names_with_embeddings(name1, name2, threshold=0.8):
@@ -55,20 +26,44 @@ def compare_names_with_embeddings(name1, name2, threshold=0.8):
             return f"Наименования не совпадают (сходство: {similarity:.2f})"
     else:
         return "Ошибка: Не удалось извлечь наименования"
+"""
+#Преобразование pdf к jpg
+def convertPDFToImage(file_path, poppler_path = 'D:\\OlegDocAnalyze\\fork_urfu_LLM_DOC\\urfu_LLM_Documents\\lama 3.1\\poppler-24.08.0\\Library\\bin'):
+    deleteFileInFolder()
+    os.environ["PATH"] += os.pathsep + poppler_path
+    images = convert_from_path(file_path)
+
+    for i, image in enumerate(images, start=1):
+        image.save(f'D:\\OlegDocAnalyze\\fork_urfu_LLM_DOC\\urfu_LLM_Documents\\lama 3.1\\proverka8\\data\\pdf_images\\page_{i}.jpg', 'JPEG')
+
+#Удаление предыдущих результатов преобразования pdf к jpg
+def deleteFileInFolder(file_path = 'D:\\OlegDocAnalyze\\fork_urfu_LLM_DOC\\urfu_LLM_Documents\\lama 3.1\\proverka8\\data\\pdf_images'):
+    for filename in os.listdir(file_path):
+        file_path = os.path.join(file_path, filename)
+        try:
+            if os.path.isfile(file_path):
+                os.remove(file_path)
+        except Exception as e:
+            print(f'Ошибка при удалении файла {file_path}. {e}')
+
+#Анализ страницы
+def analyzeImages(images_path = 'D:\\OlegDocAnalyze\\fork_urfu_LLM_DOC\\urfu_LLM_Documents\\lama 3.1\\proverka8\\data\\pdf_images'):
+    pytesseract.pytesseract.tesseract_cmd = 'D:\\OlegDocAnalyze\\fork_urfu_LLM_DOC\\urfu_LLM_Documents\\lama 3.1\\Tesseract\\tesseract.exe'
+
+    #Открываем контекст одной страницы
+    for i in range(1, len(os.listdir(images_path)) + 1):
+        img = cv2.imread(f'D:\\OlegDocAnalyze\\fork_urfu_LLM_DOC\\urfu_LLM_Documents\\lama 3.1\\proverka8\\data\\pdf_images\\page_{i}.jpg')
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+
+        print(pytesseract.image_to_string(img, lang='rus'))
+
 
 # Основная логика
 def main(pdf_path):
-    text = extract_pdf_text(pdf_path)
-    agreed_name = extract_agreed_name(text)
-    approved_name = extract_approved_name(text)
-    result = compare_names_with_embeddings(agreed_name, approved_name)
-    return agreed_name, approved_name, result
+    convertPDFToImage(pdf_path)
+    return f"Images successfully converted from {pdf_path}"
 
 # Пример
-pdf_path = "G:\\Python\\urfu_LLM_documents\\lama 3.1\\proverka8\\data\\Куса.отд.архитектуры.оп1пх.2022.pdf"
-agreed_name, approved_name, result = main(pdf_path)
-
-# Вывод
-print(f"Согласовано name: {agreed_name}")
-print(f"Утверждаю name: {approved_name}")
-print(f"Результат сравнения: {result}")
+pdf_path = 'D:\\OlegDocAnalyze\\fork_urfu_LLM_DOC\\urfu_LLM_Documents\\lama 3.1\\proverka8\\data\\Агаповский_архив,_КСП,_ф_79,_оп_2_л_с_за_2022_год (2).pdf'
+main(pdf_path)
+analyzeImages()
