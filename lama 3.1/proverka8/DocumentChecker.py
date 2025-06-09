@@ -33,16 +33,16 @@ def compare_names_with_embeddings(name1, name2, threshold=0.8):
         return "Ошибка: Не удалось извлечь наименования"
 """
 #Преобразование pdf к jpg
-def convertPDFToImage(file_path, poppler_path = 'D:\\OlegDocAnalyze\\fork_urfu_LLM_DOC\\urfu_LLM_Documents\\lama 3.1\\poppler-24.08.0\\Library\\bin'):
+def convertPDFToImage(file_path, poppler_path = 'G:\\Python\\urfu_LLM_documents\\lama 3.1\\poppler-24.08.0\\Library\\bin'):
     deleteFileInFolder()
     os.environ["PATH"] += os.pathsep + poppler_path
     images = convert_from_path(file_path)
 
     for i, image in enumerate(images, start=1):
-        image.save(f'D:\\OlegDocAnalyze\\fork_urfu_LLM_DOC\\urfu_LLM_Documents\\lama 3.1\\proverka8\\data\\pdf_images\\page_{i}.jpg', 'JPEG')
+        image.save(f'G:\\Python\\urfu_LLM_documents\\lama 3.1\\proverka8\\data\\pdf_images\\page_{i}.jpg', 'JPEG')
 
 #Удаление предыдущих результатов преобразования pdf к jpg
-def deleteFileInFolder(file_path = 'D:\\OlegDocAnalyze\\fork_urfu_LLM_DOC\\urfu_LLM_Documents\\lama 3.1\\proverka8\\data\\pdf_images'):
+def deleteFileInFolder(file_path = 'G:\\Python\\urfu_LLM_documents\\lama 3.1\\proverka8\\data\\pdf_images'):
     for filename in os.listdir(file_path):
         file_path = os.path.join(file_path, filename)
         try:
@@ -52,13 +52,13 @@ def deleteFileInFolder(file_path = 'D:\\OlegDocAnalyze\\fork_urfu_LLM_DOC\\urfu_
             print(f'Ошибка при удалении файла {file_path}. {e}')
 
 #Анализ страницы
-def analyzeImages(images_path = 'D:\\OlegDocAnalyze\\fork_urfu_LLM_DOC\\urfu_LLM_Documents\\lama 3.1\\proverka8\\data\\pdf_images', template_path = 'D:\\OlegDocAnalyze\\fork_urfu_LLM_DOC\\urfu_LLM_Documents\\lama 3.1\\proverka8\\data\\template_images'):
-    pytesseract.pytesseract.tesseract_cmd = 'D:\\OlegDocAnalyze\\fork_urfu_LLM_DOC\\urfu_LLM_Documents\\lama 3.1\\Tesseract\\tesseract.exe'
+def analyzeImages(images_path = 'G:\\Python\\urfu_LLM_documents\\lama 3.1\\proverka8\\data\\pdf_images', template_path = 'G:\\Python\\urfu_LLM_documents\\lama 3.1\\proverka8\\data\\template_images'):
+    pytesseract.pytesseract.tesseract_cmd = 'G:\\Python\\urfu_LLM_documents\\lama 3.1\\Tesseract\\tesseract.exe'
 
     template_array = []
     for j in range(1,len(os.listdir(template_path)) + 1):
         img = cv2.imread(
-            f'D:\\OlegDocAnalyze\\fork_urfu_LLM_DOC\\urfu_LLM_Documents\\lama 3.1\\proverka8\\data\\template_images\\page_{j}.png')
+            f'G:\\Python\\urfu_LLM_documents\\lama 3.1\\proverka8\\data\\template_images\\page_{j}.png')
         template_array.append(img)
 
     results_array = []
@@ -66,7 +66,7 @@ def analyzeImages(images_path = 'D:\\OlegDocAnalyze\\fork_urfu_LLM_DOC\\urfu_LLM
 
     #Открываем контекст одной страницы
     for i in range(1, len(os.listdir(images_path)) + 1):
-        img = cv2.imread(f'D:\\OlegDocAnalyze\\fork_urfu_LLM_DOC\\urfu_LLM_Documents\\lama 3.1\\proverka8\\data\\pdf_images\\page_{i}.jpg')
+        img = cv2.imread(f'G:\\Python\\urfu_LLM_documents\\lama 3.1\\proverka8\\data\\pdf_images\\page_{i}.jpg')
 
         #Выделение блоков на изображении
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
@@ -83,7 +83,7 @@ def analyzeImages(images_path = 'D:\\OlegDocAnalyze\\fork_urfu_LLM_DOC\\urfu_LLM
             (x, y, w, h) = cv2.boundingRect(c)
             #if h > 100 and w > 200:
             cv2.rectangle(img, (x, y), (x + w, y + h), (36, 255, 12), 2)
-        cv2.imwrite(f'D:\\OlegDocAnalyze\\fork_urfu_LLM_DOC\\urfu_LLM_Documents\\lama 3.1\\proverka8\\data\\change_image\\page_{i}.jpg', img)
+        cv2.imwrite(f'G:\\Python\\urfu_LLM_documents\\lama 3.1\\proverka8\\data\\change_image\\page_{i}.jpg', img)
 
 
         """
@@ -121,6 +121,6 @@ def main(pdf_path):
     return f"Images successfully converted from {pdf_path}"
 
 # Пример
-pdf_path = 'D:\\OlegDocAnalyze\\fork_urfu_LLM_DOC\\urfu_LLM_Documents\\lama 3.1\\proverka8\\data\\Агаповский_архив,_КСП,_ф_79,_оп_2_л_с_за_2022_год (2).pdf'
+pdf_path = 'G:\\Python\\urfu_LLM_documents\\lama 3.1\\proverka8\\data\\Агаповский_архив,_КСП,_ф_79,_оп_2_л_с_за_2022_год (2).pdf'
 main(pdf_path)
 analyzeImages()
