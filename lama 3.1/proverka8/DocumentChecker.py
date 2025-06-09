@@ -6,8 +6,11 @@ import fitz  # PyMuPDF
 import os
 import numpy as np
 from certifi import where
+from cv2.gapi import kernel
+from networkx.algorithms.bipartite.cluster import clustering
 from pdf2image import convert_from_path
 from sentence_transformers import SentenceTransformer, util
+from sklearn.cluster import DBSCAN
 
 """
 # Загрузка модели эмбеддингов
@@ -59,35 +62,58 @@ def analyzeImages(images_path = 'D:\\OlegDocAnalyze\\fork_urfu_LLM_DOC\\urfu_LLM
         template_array.append(img)
 
     results_array = []
+    text_on_page = ''
 
     #Открываем контекст одной страницы
     for i in range(1, len(os.listdir(images_path)) + 1):
         img = cv2.imread(f'D:\\OlegDocAnalyze\\fork_urfu_LLM_DOC\\urfu_LLM_Documents\\lama 3.1\\proverka8\\data\\pdf_images\\page_{i}.jpg')
-        for template in template_array:
-            gray_main = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-            gray_template = cv2.cvtColor(template, cv2.COLOR_BGR2GRAY)
 
-            # Шаг 4: Сопоставление шаблонов
-            result = cv2.matchTemplate(gray_main, gray_template, cv2.TM_CCOEFF)
-
-            # Шаг 5: Поиск лучшего совпадения
-            min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(result)
-            best_match_location = max_loc
-
-            # Шаг 6: Отрисовка прямоугольника
-            h, w = gray_template.shape
-            bottom_right = (best_match_location[0] + w, best_match_location[1] + h)
-            cv2.rectangle(img, best_match_location, bottom_right, (0, 255, 0), 2)
-
-            # Шаг 7: Отображение результата
-            cv2.imshow('Результат', img)
-            cv2.waitKey(0)
-            cv2.destroyAllWindows()
-
-        #print(pytesseract.image_to_string(img, lang='rus'))
+        #Выделение блоков на изображении
+        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        blur = cv2.GaussianBlur(gray, (7, 7), 0)
+        thresh = cv2.threshold(blur, 0, 255,cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)[1]
+        kernal = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 13))
+        dilate = cv2.dilate(thresh, kernal, iterations=1)
 
 
+        cnts = cv2.findContours(dilate, cv2.RETR_EXTERNAL,cv2.CHAIN_APPROX_SIMPLE)
+        cnts = cnts[0] if len(cnts) == 2 else cnts[1]
+        cnts = sorted(cnts, key=lambda x: cv2.boundingRect(x)[0])
+        for c in cnts:
+            (x, y, w, h) = cv2.boundingRect(c)
+            #if h > 100 and w > 200:
+            cv2.rectangle(img, (x, y), (x + w, y + h), (36, 255, 12), 2)
+        cv2.imwrite(f'D:\\OlegDocAnalyze\\fork_urfu_LLM_DOC\\urfu_LLM_Documents\\lama 3.1\\proverka8\\data\\change_image\\page_{i}.jpg', img)
 
+
+        """
+        text_on_page = pytesseract.image_to_string(img, lang='rus').lower()
+        print(text_on_page)
+
+        if ('утверждаю' in text_on_page or 'согласовано' in text_on_page):
+            print('Найден искомый текст!')
+
+            for template in template_array:
+                gray_main = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+                gray_template = cv2.cvtColor(template, cv2.COLOR_BGR2GRAY)
+
+                # Шаг 4: Сопоставление шаблонов
+                result = cv2.matchTemplate(gray_main, gray_template, cv2.TM_CCOEFF)
+
+                # Шаг 5: Поиск лучшего совпадения
+                min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(result)
+                best_match_location = max_loc
+
+                # Шаг 6: Отрисовка прямоугольника
+                h, w = gray_template.shape
+                bottom_right = (best_match_location[0] + w, best_match_location[1] + h)
+                cv2.rectangle(img, best_match_location, bottom_right, (0, 255, 0), 2)
+
+                # Шаг 7: Отображение результата
+                #cv2.imshow('Результат', img)
+                #cv2.waitKey(0)
+                #cv2.destroyAllWindows()
+            """
 
 # Основная логика
 def main(pdf_path):
