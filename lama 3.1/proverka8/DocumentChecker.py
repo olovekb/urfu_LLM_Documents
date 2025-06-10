@@ -1,16 +1,13 @@
-import re
 import cv2
 import pytesseract
-import poppler
-import fitz  # PyMuPDF
 import os
-import numpy as np
-from certifi import where
 from cv2.gapi import kernel
-from networkx.algorithms.bipartite.cluster import clustering
 from pdf2image import convert_from_path
-from sentence_transformers import SentenceTransformer, util
 from sklearn.cluster import DBSCAN
+from pathlib import Path
+
+def local_to_absolute_path(file_path):
+    return str(Path(file_path).resolve())
 
 """
 # Загрузка модели эмбеддингов
@@ -32,17 +29,18 @@ def compare_names_with_embeddings(name1, name2, threshold=0.8):
     else:
         return "Ошибка: Не удалось извлечь наименования"
 """
+
 #Преобразование pdf к jpg
-def convertPDFToImage(file_path, poppler_path = 'D:\\OlegDocAnalyze\\fork_urfu_LLM_DOC\\urfu_LLM_Documents\\lama 3.1\\poppler-24.08.0\\Library\\bin'):
+def convertPDFToImage(file_path, save_image_path = local_to_absolute_path('data/pdf_images'), poppler_path = local_to_absolute_path('urfu_LLM_Documents/lama 3.1/poppler-24.08.0/Library/bin')):
     deleteFileInFolder()
     os.environ["PATH"] += os.pathsep + poppler_path
     images = convert_from_path(file_path)
 
     for i, image in enumerate(images, start=1):
-        image.save(f'D:\\OlegDocAnalyze\\fork_urfu_LLM_DOC\\urfu_LLM_Documents\\lama 3.1\\proverka8\\data\\pdf_images\\page_{i}.jpg', 'JPEG')
+        image.save(f'{save_image_path}\\page_{i}.jpg', 'JPEG')
 
 #Удаление предыдущих результатов преобразования pdf к jpg
-def deleteFileInFolder(file_path = 'D:\\OlegDocAnalyze\\fork_urfu_LLM_DOC\\urfu_LLM_Documents\\lama 3.1\\proverka8\\data\\pdf_images'):
+def deleteFileInFolder(file_path = local_to_absolute_path('data/pdf_images')):
     for filename in os.listdir(file_path):
         file_path = os.path.join(file_path, filename)
         try:
@@ -52,22 +50,78 @@ def deleteFileInFolder(file_path = 'D:\\OlegDocAnalyze\\fork_urfu_LLM_DOC\\urfu_
             print(f'Ошибка при удалении файла {file_path}. {e}')
 
 #Анализ страницы
-def analyzeImages(images_path = 'D:\\OlegDocAnalyze\\fork_urfu_LLM_DOC\\urfu_LLM_Documents\\lama 3.1\\proverka8\\data\\pdf_images', template_path = 'D:\\OlegDocAnalyze\\fork_urfu_LLM_DOC\\urfu_LLM_Documents\\lama 3.1\\proverka8\\data\\template_images'):
-    pytesseract.pytesseract.tesseract_cmd = 'D:\\OlegDocAnalyze\\fork_urfu_LLM_DOC\\urfu_LLM_Documents\\lama 3.1\\Tesseract\\tesseract.exe'
-
-    template_array = []
-    for j in range(1,len(os.listdir(template_path)) + 1):
-        img = cv2.imread(
-            f'D:\\OlegDocAnalyze\\fork_urfu_LLM_DOC\\urfu_LLM_Documents\\lama 3.1\\proverka8\\data\\template_images\\page_{j}.png')
-        template_array.append(img)
-
-    results_array = []
-    text_on_page = ''
+def analyzeImages(images_path = local_to_absolute_path('data/pdf_images')):
+    pytesseract.pytesseract.tesseract_cmd = local_to_absolute_path('Tesseract/tesseract.exe')
 
     #Открываем контекст одной страницы
     for i in range(1, len(os.listdir(images_path)) + 1):
-        img = cv2.imread(f'D:\\OlegDocAnalyze\\fork_urfu_LLM_DOC\\urfu_LLM_Documents\\lama 3.1\\proverka8\\data\\pdf_images\\page_{i}.jpg')
+        img = cv2.imread(f'{local_to_absolute_path('data/pdf_images')}\\page_{i}.jpg')
 
+        data = pytesseract.image_to_data(img, lang='rus', output_type=pytesseract.Output.DICT)
+
+        boxes = []
+        centers = []
+
+        #0 - утверждено, 1 - согласовано
+        flag_arr = [False, False]
+        left_arr = []
+        top_arr = []
+
+        # Сбор прямоугольников для текста
+        for iterator in range(len(data['text'])):
+
+            if 'утвер' in data['text'][iterator].lower().strip():
+                flag_arr[0] = True
+                left_arr.append(data['left'][iterator])
+                top_arr.append(data['top'][iterator])
+
+            if 'согл' in data['text'][iterator].lower().strip():
+                flag_arr[1] = True
+                left_arr.append(data['left'][iterator])
+                top_arr.append(data['top'][iterator])
+
+            if int(data['conf'][iterator]) > 50 and flag_arr[0] and data['text'][iterator] != None and (left_arr[0] - 250 <= data['left'][iterator] or left_arr[0] + 250 >= data['left'][iterator]) and (top_arr[0] - 500 <= data['top'][iterator] and top_arr[0] + 500 >= data['top'][iterator]):
+                x, y, w, h = data['left'][iterator], data['top'][iterator], data['width'][iterator], data['height'][iterator]
+                cx, cy = x + w // 2, y + h // 2
+                boxes.append((x, y, w, h))
+                centers.append([cx, cy])
+
+            if int(data['conf'][iterator]) > 50 and flag_arr[1] and data['text'][iterator] != None and (left_arr[1] - 250 <= data['left'][iterator] or left_arr[1] + 250 >= data['left'][iterator]) and (top_arr[1] - 500 <= data['top'][iterator] and top_arr[1] + 500 >= data['top'][iterator]):
+                x, y, w, h = data['left'][iterator], data['top'][iterator], data['width'][iterator], data['height'][iterator]
+                cx, cy = x + w // 2, y + h // 2
+                boxes.append((x, y, w, h))
+                centers.append([cx, cy])
+
+        if not centers:
+            print("Текст не найден.")
+            continue
+
+        # Кластеризация по координатам центров
+        clustering = DBSCAN(eps=160, min_samples=1).fit(centers)
+        labels = clustering.labels_
+
+        # Группируем боксы по кластерам
+        clusters = {}
+        for iterator, label in enumerate(labels):
+            if label not in clusters:
+                clusters[label] = []
+            clusters[label].append(boxes[iterator])
+
+        # Рисуем рамки вокруг абзацев
+        for box_list in clusters.values():
+            xs = [x for (x, y, w, h) in box_list]
+            ys = [y for (x, y, w, h) in box_list]
+            ws = [x + w for (x, y, w, h) in box_list]
+            hs = [y + h for (x, y, w, h) in box_list]
+
+            x_min, y_min = min(xs), min(ys)
+            x_max, y_max = max(ws), max(hs)
+
+            cv2.rectangle(img, (x_min, y_min), (x_max, y_max), (10, 255, 12), 2)
+
+        #cv2.imwrite(f'{local_to_absolute_path('data/change_image')}page_{i}.jpg', img)
+
+        """
         #Выделение блоков на изображении
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
         blur = cv2.GaussianBlur(gray, (7, 7), 0)
@@ -84,7 +138,7 @@ def analyzeImages(images_path = 'D:\\OlegDocAnalyze\\fork_urfu_LLM_DOC\\urfu_LLM
             #if h > 100 and w > 200:
             cv2.rectangle(img, (x, y), (x + w, y + h), (36, 255, 12), 2)
         cv2.imwrite(f'D:\\OlegDocAnalyze\\fork_urfu_LLM_DOC\\urfu_LLM_Documents\\lama 3.1\\proverka8\\data\\change_image\\page_{i}.jpg', img)
-
+        """
 
         """
         text_on_page = pytesseract.image_to_string(img, lang='rus').lower()
@@ -118,9 +172,10 @@ def analyzeImages(images_path = 'D:\\OlegDocAnalyze\\fork_urfu_LLM_DOC\\urfu_LLM
 # Основная логика
 def main(pdf_path):
     convertPDFToImage(pdf_path)
+    analyzeImages()
     return f"Images successfully converted from {pdf_path}"
 
-# Пример
+# Запуск
 pdf_path = 'D:\\OlegDocAnalyze\\fork_urfu_LLM_DOC\\urfu_LLM_Documents\\lama 3.1\\proverka8\\data\\Агаповский_архив,_КСП,_ф_79,_оп_2_л_с_за_2022_год (2).pdf'
+
 main(pdf_path)
-analyzeImages()
