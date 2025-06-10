@@ -64,33 +64,35 @@ def analyzeImages(images_path = local_to_absolute_path('data/pdf_images')):
 
         #0 - утверждено, 1 - согласовано
         flag_arr = [False, False]
-        left_arr = []
-        top_arr = []
+        left_arr = [0, 0]
+        top_arr = [0, 0]
 
         # Сбор прямоугольников для текста
         for iterator in range(len(data['text'])):
 
-            if 'утвер' in data['text'][iterator].lower().strip():
+            if 'утверждаю' in data['text'][iterator].lower().strip() or 'утверждено' in data['text'][iterator].lower().strip():
                 flag_arr[0] = True
-                left_arr.append(data['left'][iterator])
-                top_arr.append(data['top'][iterator])
+                left_arr[0] = int(data['left'][iterator])
+                top_arr[0] = int(data['top'][iterator])
 
-            if 'согл' in data['text'][iterator].lower().strip():
+            if 'согласовано' in data['text'][iterator].lower().strip():
                 flag_arr[1] = True
-                left_arr.append(data['left'][iterator])
-                top_arr.append(data['top'][iterator])
+                left_arr[1] = int(data['left'][iterator])
+                top_arr[1] = int(data['top'][iterator])
 
-            if int(data['conf'][iterator]) > 50 and flag_arr[0] and data['text'][iterator] != None and (left_arr[0] - 250 <= data['left'][iterator] or left_arr[0] + 250 >= data['left'][iterator]) and (top_arr[0] - 500 <= data['top'][iterator] and top_arr[0] + 500 >= data['top'][iterator]):
-                x, y, w, h = data['left'][iterator], data['top'][iterator], data['width'][iterator], data['height'][iterator]
-                cx, cy = x + w // 2, y + h // 2
-                boxes.append((x, y, w, h))
-                centers.append([cx, cy])
+            if flag_arr[0]:
+                if int(data['conf'][iterator]) > 50 and flag_arr[0] and data['text'][iterator] != None and (left_arr[0] - 250 <= data['left'][iterator] or left_arr[0] + 250 >= data['left'][iterator]) and (top_arr[0] - 500 <= data['top'][iterator] and top_arr[0] + 500 >= data['top'][iterator]):
+                    x, y, w, h = data['left'][iterator], data['top'][iterator], data['width'][iterator], data['height'][iterator]
+                    cx, cy = x + w // 2, y + h // 2
+                    boxes.append((x, y, w, h))
+                    centers.append([cx, cy])
 
-            if int(data['conf'][iterator]) > 50 and flag_arr[1] and data['text'][iterator] != None and (left_arr[1] - 250 <= data['left'][iterator] or left_arr[1] + 250 >= data['left'][iterator]) and (top_arr[1] - 500 <= data['top'][iterator] and top_arr[1] + 500 >= data['top'][iterator]):
-                x, y, w, h = data['left'][iterator], data['top'][iterator], data['width'][iterator], data['height'][iterator]
-                cx, cy = x + w // 2, y + h // 2
-                boxes.append((x, y, w, h))
-                centers.append([cx, cy])
+            if flag_arr[1]:
+                if int(data['conf'][iterator]) > 50 and flag_arr[1] and data['text'][iterator] != None and (left_arr[1] - 250 <= data['left'][iterator] or left_arr[1] + 250 >= data['left'][iterator]) and (top_arr[1] - 500 <= data['top'][iterator] and top_arr[1] + 500 >= data['top'][iterator]):
+                    x, y, w, h = data['left'][iterator], data['top'][iterator], data['width'][iterator], data['height'][iterator]
+                    cx, cy = x + w // 2, y + h // 2
+                    boxes.append((x, y, w, h))
+                    centers.append([cx, cy])
 
         if not centers:
             print("Текст не найден.")
@@ -119,7 +121,7 @@ def analyzeImages(images_path = local_to_absolute_path('data/pdf_images')):
 
             cv2.rectangle(img, (x_min, y_min), (x_max, y_max), (10, 255, 12), 2)
 
-        #cv2.imwrite(f'{local_to_absolute_path('data/change_image')}page_{i}.jpg', img)
+        cv2.imwrite(f'{local_to_absolute_path('data/change_image')}\\page_{i}.jpg', img)
 
         """
         #Выделение блоков на изображении
@@ -140,35 +142,6 @@ def analyzeImages(images_path = local_to_absolute_path('data/pdf_images')):
         cv2.imwrite(f'D:\\OlegDocAnalyze\\fork_urfu_LLM_DOC\\urfu_LLM_Documents\\lama 3.1\\proverka8\\data\\change_image\\page_{i}.jpg', img)
         """
 
-        """
-        text_on_page = pytesseract.image_to_string(img, lang='rus').lower()
-        print(text_on_page)
-
-        if ('утверждаю' in text_on_page or 'согласовано' in text_on_page):
-            print('Найден искомый текст!')
-
-            for template in template_array:
-                gray_main = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-                gray_template = cv2.cvtColor(template, cv2.COLOR_BGR2GRAY)
-
-                # Шаг 4: Сопоставление шаблонов
-                result = cv2.matchTemplate(gray_main, gray_template, cv2.TM_CCOEFF)
-
-                # Шаг 5: Поиск лучшего совпадения
-                min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(result)
-                best_match_location = max_loc
-
-                # Шаг 6: Отрисовка прямоугольника
-                h, w = gray_template.shape
-                bottom_right = (best_match_location[0] + w, best_match_location[1] + h)
-                cv2.rectangle(img, best_match_location, bottom_right, (0, 255, 0), 2)
-
-                # Шаг 7: Отображение результата
-                #cv2.imshow('Результат', img)
-                #cv2.waitKey(0)
-                #cv2.destroyAllWindows()
-            """
-
 # Основная логика
 def main(pdf_path):
     convertPDFToImage(pdf_path)
@@ -176,6 +149,6 @@ def main(pdf_path):
     return f"Images successfully converted from {pdf_path}"
 
 # Запуск
-pdf_path = 'D:\\OlegDocAnalyze\\fork_urfu_LLM_DOC\\urfu_LLM_Documents\\lama 3.1\\proverka8\\data\\Агаповский_архив,_КСП,_ф_79,_оп_2_л_с_за_2022_год (2).pdf'
+pdf_path = 'D:\\OlegDocAnalyze\\fork_urfu_LLM_DOC\\urfu_LLM_Documents\\lama 3.1\\proverka8\\data\\СП_16_Магнит_отдел_Выборы_Гос_Дума_2016_оп_2_п_хр_.pdf'
 
 main(pdf_path)
