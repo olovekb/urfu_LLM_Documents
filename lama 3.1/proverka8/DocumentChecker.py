@@ -33,7 +33,7 @@ def build_table(images_path = local_to_absolute_path('lama 3.1/proverka8/data/pd
         gray = cv2.cvtColor(filterd_image, cv2.COLOR_BGR2GRAY)
 
         # Бинаризация
-        ret, thresh = cv2.threshold(gray, 200, 255, cv2.THRESH_BINARY)
+        ret, thresh = cv2.threshold(gray, 150, 255, cv2.THRESH_BINARY)
 
         # Поиск контуров заголовков
         contours, hierarchy = cv2.findContours(thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
@@ -180,7 +180,7 @@ def apply_dilate():
     dilate_folder = local_to_absolute_path(r'G:\Python\urfu_LLM_documents\lama 3.1\proverka8\dilate_image')
     
     # Создаем ядро для dilate
-    kernal = cv2.getStructuringElement(cv2.MORPH_RECT, (5, 15))
+    kernal = cv2.getStructuringElement(cv2.MORPH_RECT, (10, 30))
     
     # Проходим по изображениям в папке threshold_image и применяем dilate
     for filename in os.listdir(threshold_folder):
@@ -201,7 +201,6 @@ def build_table_after_preprocessing(images_path = local_to_absolute_path('lama 3
     change_image_folder = r'G:\Python\urfu_LLM_documents\lama 3.1\proverka8\change_image'  # Папка с исходными изображениями
 
     for iterator in range(1, len(os.listdir(images_path)) + 1):
-        # Загружаем обработанное изображение из папки dilate_image
         dilate_path = os.path.join(images_path, f'result_image_{iterator}.jpg')
         dilate = cv2.imread(dilate_path)
 
@@ -210,7 +209,6 @@ def build_table_after_preprocessing(images_path = local_to_absolute_path('lama 3
             print(f"Не удалось загрузить изображение {dilate_path}")
             continue
 
-        # Загружаем исходное изображение из папки change_image
         image_path = os.path.join(change_image_folder, f'result_image_{iterator}.jpg')
         image = cv2.imread(image_path)
 
@@ -222,8 +220,15 @@ def build_table_after_preprocessing(images_path = local_to_absolute_path('lama 3
         # Преобразуем изображение dilate в серый цвет для поиска контуров
         gray_dilate = cv2.cvtColor(dilate, cv2.COLOR_BGR2GRAY)
 
-        # Поиск контуров на изображении, которое уже прошло dilate (в сером формате)
-        cnts, _ = cv2.findContours(gray_dilate, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        # Применение пороговой обработки для выделения контуров
+        _, thresh = cv2.threshold(gray_dilate, 150, 255, cv2.THRESH_BINARY_INV)
+
+        # Морфологическое расширение для улучшения контуров
+        kernal = cv2.getStructuringElement(cv2.MORPH_RECT, (13, 30))  # Увеличиваем размер ядра
+        dilated = cv2.dilate(thresh, kernal, iterations=1)
+
+        # Поиск контуров на изображении
+        cnts, _ = cv2.findContours(dilated, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
         # Сортировка контуров по координате X (влево-направо)
         cnts = sorted(cnts, key=lambda x: cv2.boundingRect(x)[0])
@@ -231,7 +236,7 @@ def build_table_after_preprocessing(images_path = local_to_absolute_path('lama 3
         # Рисование прямоугольников для каждого контура на исходном изображении
         for c in cnts:
             x, y, w, h = cv2.boundingRect(c)
-            if w > 80 and h > 30:  # Фильтрация контуров по размерам
+            if w > 80 and h > 30:  # Фильтрация по размерам столбцов
                 cv2.rectangle(image, (x, y), (x + w, y + h), (36, 255, 12), 2)
 
         # Сохранение изображения с прямоугольниками
