@@ -31,7 +31,7 @@ def compare_names_with_embeddings(name1, name2, threshold=0.8):
 """
 
 #Преобразование pdf к jpg
-def convertPDFToImage(file_path, save_image_path = local_to_absolute_path('data/pdf_images'), poppler_path = local_to_absolute_path('urfu_LLM_Documents/lama 3.1/poppler-24.08.0/Library/bin')):
+def convertPDFToImage(file_path, save_image_path = local_to_absolute_path('lama 3.1/proverka8/data/pdf_images'), poppler_path = local_to_absolute_path('urfu_LLM_Documents/lama 3.1/poppler-24.08.0/Library/bin')):
     deleteFileInFolder()
     os.environ["PATH"] += os.pathsep + poppler_path
     images = convert_from_path(file_path)
@@ -40,7 +40,7 @@ def convertPDFToImage(file_path, save_image_path = local_to_absolute_path('data/
         image.save(f'{save_image_path}\\page_{i}.jpg', 'JPEG')
 
 #Удаление предыдущих результатов преобразования pdf к jpg
-def deleteFileInFolder(file_path = local_to_absolute_path('data/pdf_images')):
+def deleteFileInFolder(file_path = local_to_absolute_path('lama 3.1/proverka8/data/pdf_images')):
     for filename in os.listdir(file_path):
         file_path = os.path.join(file_path, filename)
         try:
@@ -50,12 +50,12 @@ def deleteFileInFolder(file_path = local_to_absolute_path('data/pdf_images')):
             print(f'Ошибка при удалении файла {file_path}. {e}')
 
 #Анализ страницы
-def analyzeImages(images_path = local_to_absolute_path('data/pdf_images')):
-    pytesseract.pytesseract.tesseract_cmd = local_to_absolute_path('Tesseract/tesseract.exe')
+def analyzeImages(images_path = local_to_absolute_path('lama 3.1/proverka8/data/pdf_images')):
+    pytesseract.pytesseract.tesseract_cmd = local_to_absolute_path('lama 3.1/proverka8/Tesseract/tesseract.exe')
 
     #Открываем контекст одной страницы
     for i in range(1, len(os.listdir(images_path)) + 1):
-        img = cv2.imread(f'{local_to_absolute_path('data/pdf_images')}\\page_{i}.jpg')
+        img = cv2.imread(f'{local_to_absolute_path('lama 3.1/proverka8/data/pdf_images')}\\page_{i}.jpg')
 
         data = pytesseract.image_to_data(img, lang='rus', output_type=pytesseract.Output.DICT)
 
@@ -121,7 +121,7 @@ def analyzeImages(images_path = local_to_absolute_path('data/pdf_images')):
 
             cv2.rectangle(img, (x_min, y_min), (x_max, y_max), (10, 255, 12), 2)
 
-        cv2.imwrite(f'{local_to_absolute_path('data/change_image')}\\page_{i}.jpg', img)
+        cv2.imwrite(f'{local_to_absolute_path('lama 3.1/proverka8/data/change_image')}\\page_{i}.jpg', img)
 
         """
         #Выделение блоков на изображении
@@ -139,7 +139,7 @@ def analyzeImages(images_path = local_to_absolute_path('data/pdf_images')):
             (x, y, w, h) = cv2.boundingRect(c)
             #if h > 100 and w > 200:
             cv2.rectangle(img, (x, y), (x + w, y + h), (36, 255, 12), 2)
-        cv2.imwrite(f'D:\\OlegDocAnalyze\\fork_urfu_LLM_DOC\\urfu_LLM_Documents\\lama 3.1\\proverka8\\data\\change_image\\page_{i}.jpg', img)
+        cv2.imwrite(f'G:\\Python\\urfu_LLM_documents\\lama 3.1\\proverka8\\data\\change_image\\page_{i}.jpg', img)
         """
 
 # Основная логика
@@ -149,6 +149,6 @@ def main(pdf_path):
     return f"Images successfully converted from {pdf_path}"
 
 # Запуск
-pdf_path = 'D:\\OlegDocAnalyze\\fork_urfu_LLM_DOC\\urfu_LLM_Documents\\lama 3.1\\proverka8\\data\\СП_16_Магнит_отдел_Выборы_Гос_Дума_2016_оп_2_п_хр_.pdf'
+pdf_path = r'G:/Python/urfu_LLM_documents/lama 3.1/proverka8/data/СП_16_Магнит_отдел_Выборы_Гос_Дума_2016_оп_2_п_хр_.pdf'
 
 main(pdf_path)
