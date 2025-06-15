@@ -79,7 +79,8 @@ def delete_file_in_folder():
         r'G:\Python\urfu_LLM_documents\lama 3.1\proverka8\blur_image',
         r'G:\Python\urfu_LLM_documents\lama 3.1\proverka8\threshold_image',
         r'G:\Python\urfu_LLM_documents\lama 3.1\proverka8\kernal_image',
-        r'G:\Python\urfu_LLM_documents\lama 3.1\proverka8\dilate_image'
+        r'G:\Python\urfu_LLM_documents\lama 3.1\proverka8\dilate_image',
+        r'G:\Python\urfu_LLM_documents\lama 3.1\proverka8\bbox_image'
     ]
 
     for folder in folders_to_delete:
@@ -188,12 +189,56 @@ def apply_dilate():
             image = cv2.imread(img_path)
             
             # Применяем dilate
-            dilated_image = cv2.dilate(image, kernal, iterations=1)
+            dilate = cv2.dilate(image, kernal, iterations=1)
             
             # Сохраняем результат в папке dilate_image
             dilate_path = os.path.join(dilate_folder, filename)
-            cv2.imwrite(dilate_path, dilated_image)
+            cv2.imwrite(dilate_path, dilate)
             print(f"Сохранено изображение с dilate: {dilate_path}")
+
+def build_table_after_preprocessing(images_path = local_to_absolute_path('lama 3.1/proverka8/dilate_image')):
+    bbox_image_folder = r'G:\Python\urfu_LLM_documents\lama 3.1\proverka8\bbox_image'
+    change_image_folder = r'G:\Python\urfu_LLM_documents\lama 3.1\proverka8\change_image'  # Папка с исходными изображениями
+
+    for iterator in range(1, len(os.listdir(images_path)) + 1):
+        # Загружаем обработанное изображение из папки dilate_image
+        dilate_path = os.path.join(images_path, f'result_image_{iterator}.jpg')
+        dilate = cv2.imread(dilate_path)
+
+        # Проверка, что изображение прошло dilate и успешно загружено
+        if dilate is None:
+            print(f"Не удалось загрузить изображение {dilate_path}")
+            continue
+
+        # Загружаем исходное изображение из папки change_image
+        image_path = os.path.join(change_image_folder, f'result_image_{iterator}.jpg')
+        image = cv2.imread(image_path)
+
+        # Проверка, что исходное изображение успешно загружено
+        if image is None:
+            print(f"Не удалось загрузить исходное изображение {image_path}")
+            continue
+
+        # Преобразуем изображение dilate в серый цвет для поиска контуров
+        gray_dilate = cv2.cvtColor(dilate, cv2.COLOR_BGR2GRAY)
+
+        # Поиск контуров на изображении, которое уже прошло dilate (в сером формате)
+        cnts, _ = cv2.findContours(gray_dilate, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+        # Сортировка контуров по координате X (влево-направо)
+        cnts = sorted(cnts, key=lambda x: cv2.boundingRect(x)[0])
+
+        # Рисование прямоугольников для каждого контура на исходном изображении
+        for c in cnts:
+            x, y, w, h = cv2.boundingRect(c)
+            if w > 80 and h > 30:  # Фильтрация контуров по размерам
+                cv2.rectangle(image, (x, y), (x + w, y + h), (36, 255, 12), 2)
+
+        # Сохранение изображения с прямоугольниками
+        result_image_path = os.path.join(bbox_image_folder, f'result_image_{iterator}.jpg')
+        cv2.imwrite(result_image_path, image)
+        print(f"Сохранено изображение с контурами: {result_image_path}")
+
 
 def main():
     delete_file_in_folder()  # Удаляем файлы из всех папок
@@ -205,5 +250,6 @@ def main():
     apply_threshold()  # Применяем пороговую обработку к изображениям
     apply_kernal()  # Применяем морфологическое преобразование (kernal)
     apply_dilate()  # Применяем dilate к изображениям
+    build_table_after_preprocessing()
 
 main()
