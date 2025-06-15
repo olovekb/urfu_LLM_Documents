@@ -1,73 +1,172 @@
-import cv2
-import pytesseract
 import os
-from pdf2image import convert_from_path
+import cv2
+import fitz  # PyMuPDF
 from pathlib import Path
 
-# Укажите путь к tesseract.exe
-pytesseract.pytesseract.tesseract_cmd = r'G:\Python\urfu_LLM_documents\lama 3.1\Tesseract\tesseract.exe'
+# Функция для преобразования относительных путей в абсолютные
+def local_to_absolute_path(file_path):
+    return str(Path(file_path).resolve())
 
-# Функция для преобразования PDF в JPEG с указанием пути к Poppler
-def convert_pdf_to_jpeg(pdf_path, output_folder, poppler_path):
-    # Преобразуем пути в абсолютные пути для корректной работы с кириллицей
-    pdf_path = Path(pdf_path).resolve()
-    output_folder = Path(output_folder).resolve()
+# Преобразование pdf в jpg с использованием PyMuPDF
+def convert_PDF_to_image(file_path, save_image_path = local_to_absolute_path(r'G:\Python\urfu_LLM_documents\lama 3.1\proverka8\change_image')):
+    print('Шаг 1: Конвертация pdf в изображение...')
     
-    if not pdf_path.exists():
-        print(f"Файл не найден: {pdf_path}")
+    # Проверяем, существует ли файл
+    if not os.path.exists(file_path):
+        print(f"Ошибка: файл {file_path} не найден.")
         return
-
-    os.environ["PATH"] += os.pathsep + poppler_path  # Добавляем Poppler в PATH
+    
+    # Открываем PDF файл с использованием PyMuPDF
     try:
-        images = convert_from_path(str(pdf_path))  # Преобразование PDF в изображения
-        for i, image in enumerate(images, start=1):
-            image.save(str(output_folder / f'page_{i}.jpg'), 'JPEG')
+        doc = fitz.open(file_path)
     except Exception as e:
-        print(f"Ошибка при преобразовании PDF: {e}")
+        print(f"Ошибка при открытии PDF: {e}")
+        return
+    
+    # Проходим по всем страницам PDF
+    for page_num in range(doc.page_count):
+        page = doc.load_page(page_num)  # Загружаем страницу
+        pix = page.get_pixmap()  # Получаем изображение страницы
+        output_path = os.path.join(save_image_path, f"page_{page_num + 1}.jpg")
+        pix.save(output_path)  # Сохраняем изображение в формате JPG
+        print(f"Страница {page_num + 1} сохранена как {output_path}")
 
-# Путь к папке для сохранения изображений
-image_folder = r'G:\Python\urfu_LLM_documents\lama 3.1\proverka8\change_image'
-pdf_path = r'G:\Python\urfu_LLM_documents\lama 3.1\proverka8\data\МАГНИТ_МКУ,_ЗАО_БЕЛКА,_Ф_Р_507,_ОП_697,ЛС_1.pdf'
-poppler_path = r'G:\Python\urfu_LLM_documents\lama 3.1\poppler-24.08.0\Library\bin'
+# Удаление файлов из всех папок
+def delete_file_in_folder():
+    folders_to_delete = [
+        r'G:\Python\urfu_LLM_documents\lama 3.1\proverka8\change_image',
+        r'G:\Python\urfu_LLM_documents\lama 3.1\proverka8\gray_image',
+        r'G:\Python\urfu_LLM_documents\lama 3.1\proverka8\blur_image',
+        r'G:\Python\urfu_LLM_documents\lama 3.1\proverka8\threshold_image',
+        r'G:\Python\urfu_LLM_documents\lama 3.1\proverka8\kernal_image',
+        r'G:\Python\urfu_LLM_documents\lama 3.1\proverka8\dilate_image'
+    ]
 
-# Преобразование PDF в JPEG
-convert_pdf_to_jpeg(pdf_path, image_folder, poppler_path)
+    for folder in folders_to_delete:
+        folder_path = local_to_absolute_path(folder) + '\\'
+        if os.path.exists(folder_path):  # Проверяем, существует ли папка
+            for value in os.listdir(folder_path):
+                try:
+                    file_path = os.path.join(folder_path, value)
+                    if os.path.isfile(file_path) and value.endswith(".jpg"):
+                        os.remove(file_path)
+                        print(f'Удален файл {file_path}')
+                except Exception as e:
+                    print(f'Ошибка при удалении файла {file_path}. {e}')
+        else:
+            print(f"Папка не существует: {folder_path}")
+            os.makedirs(folder_path)  # Создаем папку, если она не существует
 
-# Получаем список всех файлов в папке
-image_files = [f for f in os.listdir(image_folder) if f.lower().endswith(('.png', '.jpg', '.jpeg'))]
+# Преобразование всех изображений в серые
+def convert_to_gray():
+    image_folder = local_to_absolute_path(r'G:\Python\urfu_LLM_documents\lama 3.1\proverka8\change_image')
+    gray_folder = local_to_absolute_path(r'G:\Python\urfu_LLM_documents\lama 3.1\proverka8\gray_image')
+    
+    # Проходим по изображениям в папке change_image и конвертируем их в серые
+    for filename in os.listdir(image_folder):
+        if filename.endswith(".jpg"):
+            img_path = os.path.join(image_folder, filename)
+            image = cv2.imread(img_path)
+            gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)  # Преобразование в серый цвет
+            
+            # Сохраняем результат в папке gray_image
+            gray_path = os.path.join(gray_folder, filename)
+            cv2.imwrite(gray_path, gray_image)
+            print(f"Сохранено серое изображение: {gray_path}")
 
-# Обрабатываем каждое изображение
-for image_file in image_files:
-    image_path = os.path.join(image_folder, image_file)
-    img = cv2.imread(image_path)
+# Применение размытия к изображениям
+def apply_gaussian_blur():
+    gray_folder = local_to_absolute_path(r'G:\Python\urfu_LLM_documents\lama 3.1\proverka8\gray_image')
+    blur_folder = local_to_absolute_path(r'G:\Python\urfu_LLM_documents\lama 3.1\proverka8\blur_image')
+    
+    # Проходим по изображениям в папке gray_image и применяем размытие
+    for filename in os.listdir(gray_folder):
+        if filename.endswith(".jpg"):
+            img_path = os.path.join(gray_folder, filename)
+            image = cv2.imread(img_path)
+            blurred_image = cv2.GaussianBlur(image, (7, 7), 0)  # Применение размытия
+            
+            # Сохраняем результат в папке blur_image
+            blur_path = os.path.join(blur_folder, filename)
+            cv2.imwrite(blur_path, blurred_image)
+            print(f"Сохранено размытое изображение: {blur_path}")
 
-    # Преобразование изображения в оттенки серого
-    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+# Применение пороговой обработки
+def apply_threshold():
+    blur_folder = local_to_absolute_path(r'G:\Python\urfu_LLM_documents\lama 3.1\proverka8\blur_image')
+    threshold_folder = local_to_absolute_path(r'G:\Python\urfu_LLM_documents\lama 3.1\proverka8\threshold_image')
+    
+    # Проходим по изображениям в папке blur_image и применяем пороговую обработку
+    for filename in os.listdir(blur_folder):
+        if filename.endswith(".jpg"):
+            img_path = os.path.join(blur_folder, filename)
+            image = cv2.imread(img_path)
+            
+            # Преобразуем изображение в оттенки серого (если оно не серое)
+            if len(image.shape) == 3:  # если изображение цветное
+                image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+            
+            # Применяем пороговую обработку
+            ret, thresh = cv2.threshold(image, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
+            
+            # Сохраняем результат в папке threshold_image
+            threshold_path = os.path.join(threshold_folder, filename)
+            cv2.imwrite(threshold_path, thresh)
+            print(f"Сохранено пороговое изображение: {threshold_path}")
 
-    # Применение бинаризации для выделения контуров
-    _, thresh = cv2.threshold(gray, 150, 255, cv2.THRESH_BINARY_INV)
+# Применение техники морфологического преобразования (kernal)
+def apply_kernal():
+    threshold_folder = local_to_absolute_path(r'G:\Python\urfu_LLM_documents\lama 3.1\proverka8\threshold_image')
+    kernal_folder = local_to_absolute_path(r'G:\Python\urfu_LLM_documents\lama 3.1\proverka8\kernal_image')
+    
+    # Создаем ядро для морфологической операции
+    kernal = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 13))
+    
+    # Проходим по изображениям в папке threshold_image и применяем морфологическое преобразование
+    for filename in os.listdir(threshold_folder):
+        if filename.endswith(".jpg"):
+            img_path = os.path.join(threshold_folder, filename)
+            image = cv2.imread(img_path)
+            
+            # Применяем морфологическое преобразование (dilation)
+            kernal_image = cv2.morphologyEx(image, cv2.MORPH_DILATE, kernal)
+            
+            # Сохраняем результат в папке kernal_image
+            kernal_path = os.path.join(kernal_folder, filename)
+            cv2.imwrite(kernal_path, kernal_image)
+            print(f"Сохранено изображение с морфологическим преобразованием: {kernal_path}")
 
-    # Поиск контуров
-    contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+# Применение техники dilate
+def apply_dilate():
+    threshold_folder = local_to_absolute_path(r'G:\Python\urfu_LLM_documents\lama 3.1\proverka8\threshold_image')
+    dilate_folder = local_to_absolute_path(r'G:\Python\urfu_LLM_documents\lama 3.1\proverka8\dilate_image')
+    
+    # Создаем ядро для dilate
+    kernal = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 13))
+    
+    # Проходим по изображениям в папке threshold_image и применяем dilate
+    for filename in os.listdir(threshold_folder):
+        if filename.endswith(".jpg"):
+            img_path = os.path.join(threshold_folder, filename)
+            image = cv2.imread(img_path)
+            
+            # Применяем dilate
+            dilated_image = cv2.dilate(image, kernal, iterations=1)
+            
+            # Сохраняем результат в папке dilate_image
+            dilate_path = os.path.join(dilate_folder, filename)
+            cv2.imwrite(dilate_path, dilated_image)
+            print(f"Сохранено изображение с dilate: {dilate_path}")
 
-    # Фильтрация контуров по размеру (можно настроить в зависимости от таблицы)
-    min_width, min_height = 50, 20
-    filtered_contours = [cnt for cnt in contours if cv2.boundingRect(cnt)[2] > min_width and cv2.boundingRect(cnt)[3] > min_height]
+def main():
+    delete_file_in_folder()  # Удаляем файлы из всех папок
+    pdf_path = r'G:\Python\urfu_LLM_documents\lama 3.1\proverka8\data\pdf_images\Кунашак, КРК, оп 1, п.хр. (3).pdf'  # Укажите путь к своему PDF
+    convert_PDF_to_image(pdf_path)  # Конвертируем PDF в изображения
+    convert_to_gray()  # Преобразуем все изображения в серые
+    apply_gaussian_blur()  # Применяем размытие к изображениям
+    apply_threshold()  # Применяем пороговую обработку к изображениям
+    apply_kernal()  # Применяем морфологическое преобразование (kernal)
+    apply_dilate()  # Применяем dilate к изображениям
 
-    # Перебор контуров для нахождения текста в таблице
-    for cnt in filtered_contours:
-        x, y, w, h = cv2.boundingRect(cnt)
-        roi = img[y:y+h, x:x+w]
-
-        # Извлечение текста с помощью pytesseract
-        text = pytesseract.image_to_string(roi, lang='rus', config='--psm 6')
-
-        # Проверка на ключевые слова для столбцов
-        keywords = ['№ п/п', 'Индекс дела', 'Заголовок дела', 'Крайние даты', 'Кол-во листов', 'Примечание']
-        if any(keyword in text for keyword in keywords):
-            # Рисуем рамку вокруг найденного текста
-            cv2.rectangle(img, (x, y), (x + w, y + h), (10, 255, 12), 2)
-            print(f"Текст найден в области {x}, {y}, {w}, {h}: {text}")
-
-    # Сохраняем изображение с рамками
-    cv2.imwrite(f'{os.path.join(image_folder, "annotated_" + image_file)}', img)
+# Запуск
+main()
