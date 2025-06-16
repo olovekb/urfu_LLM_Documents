@@ -19,14 +19,14 @@ def check_empty_array_elements(array):
 # Сравнение с использованием эмбеддингов напрямую
 def compare_names_with_embeddings(threshold=0.6):
     print('Шаг 3 Анализ блоков \'Утверждаю\' и \'Согласовано\'')
-    pytesseract.pytesseract.tesseract_cmd = local_to_absolute_path('lama 3.1/proverka8/Tesseract/tesseract.exe')
+    pytesseract.pytesseract.tesseract_cmd = local_to_absolute_path('Libraries/Tesseract/tesseract.exe')
 
     approve_arr = []
     agreed_arr = []
 
     #todo нужно сделать отсеивание элементов, если они идут спустя 4 пустых элемента массива
-    for value in os.listdir(local_to_absolute_path('lama 3.1/proverka8/data/change_image')):
-        img = cv2.imread(local_to_absolute_path('lama 3.1/proverka8/data/change_image/' + value))
+    for value in os.listdir(local_to_absolute_path('proverka8/data/change_image')):
+        img = cv2.imread(local_to_absolute_path('proverka8/data/change_image/' + value))
         data = pytesseract.image_to_data(img, lang='rus', output_type=pytesseract.Output.DICT)
 
         for iterator in range(len(data)):
@@ -85,7 +85,7 @@ def compare_names_with_embeddings(threshold=0.6):
         print("Ошибка!\nНаименования не найдены!")
 
 #Преобразование pdf к jpg
-def convert_PDF_to_image(file_path, save_image_path = local_to_absolute_path('lama 3.1/proverka8/data/pdf_images'), poppler_path = local_to_absolute_path('urfu_LLM_Documents/lama 3.1/poppler-24.08.0/Library/bin')):
+def convert_PDF_to_image(file_path, save_image_path = local_to_absolute_path('proverka8/data/pdf_images'), poppler_path = local_to_absolute_path('urfu_LLM_documents/Libraries/poppler-24.08.0/Library/bin')):
     print('Шаг 1 Конвертация pdf к изображению...')
     os.environ["PATH"] += os.pathsep + poppler_path
     images = convert_from_path(file_path)
@@ -96,7 +96,7 @@ def convert_PDF_to_image(file_path, save_image_path = local_to_absolute_path('la
 #Удаление предыдущих результатов преобразования pdf к jpg
 def delete_file_in_folder():
 
-    file_path_to_delete = local_to_absolute_path('lama 3.1/proverka8/data/pdf_images') + '\\'
+    file_path_to_delete = local_to_absolute_path('proverka8/data/pdf_images') + '\\'
     for value in os.listdir(file_path_to_delete):
         try:
             if os.path.isfile(file_path_to_delete + value):
@@ -104,7 +104,7 @@ def delete_file_in_folder():
         except Exception as e:
             print(f'Ошибка при удалении файла {value}. {e}')
 
-    file_path_to_delete = local_to_absolute_path('lama 3.1/proverka8/data/change_image')  + '\\'
+    file_path_to_delete = local_to_absolute_path('proverka8/data/change_image')  + '\\'
     for value in os.listdir(file_path_to_delete):
         try:
             if os.path.isfile(file_path_to_delete + value):
@@ -113,15 +113,15 @@ def delete_file_in_folder():
             print(f'Ошибка при удалении файла {value}. {e}')
 
 #Анализ страницы
-def get_text_blocks(images_path = local_to_absolute_path('lama 3.1/proverka8/data/pdf_images')):
+def get_text_blocks(images_path = local_to_absolute_path('proverka8/data/pdf_images')):
     print('Шаг 2 Подготовка к обработке изображения')
-    pytesseract.pytesseract.tesseract_cmd = local_to_absolute_path('lama 3.1/proverka8/Tesseract/tesseract.exe')
+    pytesseract.pytesseract.tesseract_cmd = local_to_absolute_path('Libraries/Tesseract/tesseract.exe')
 
     page_counter = 0
 
     #Открываем контекст одной страницы
     for i in range(1, len(os.listdir(images_path)) + 1):
-        img = cv2.imread(f'{local_to_absolute_path('lama 3.1/proverka8/data/pdf_images')}\\page_{i}.jpg')
+        img = cv2.imread(f'{local_to_absolute_path('proverka8/data/pdf_images')}\\page_{i}.jpg')
 
         data = pytesseract.image_to_data(img, lang='rus', output_type=pytesseract.Output.DICT)
 
@@ -195,8 +195,8 @@ def get_text_blocks(images_path = local_to_absolute_path('lama 3.1/proverka8/dat
 
             for iterator in range(len(cropped_image_data['text'])):
                 if 'утверждаю' in cropped_image_data['text'][iterator].lower().strip() or 'утверждено' in cropped_image_data['text'][iterator].lower().strip() or 'согласов' in cropped_image_data['text'][iterator].lower().strip():
-                    cv2.imwrite(f'{local_to_absolute_path('lama 3.1/proverka8/data/change_image')}\\cropped_image_{page_counter}.jpg', cropped_image)
-                    print(f'Добавлен файл {local_to_absolute_path('lama 3.1/proverka8/data/change_image')}\\cropped_image_{page_counter}.jpg')
+                    cv2.imwrite(f'{local_to_absolute_path('proverka8/data/change_image')}\\cropped_image_{page_counter}.jpg', cropped_image)
+                    print(f'Добавлен файл {local_to_absolute_path('proverka8/data/change_image')}\\cropped_image_{page_counter}.jpg')
 
 
 
@@ -211,6 +211,6 @@ def main(pdf_path):
     compare_names_with_embeddings()
 
 # Запуск
-pdf_path = r'G:/Python/urfu_LLM_documents/lama 3.1/proverka8/data/СП_16_Магнит_отдел_Выборы_Гос_Дума_2016_оп_2_п_хр_.pdf'
+pdf_path = r'G:/Python/urfu_LLM_documents/proverka8/data/СП_16_Магнит_отдел_Выборы_Гос_Дума_2016_оп_2_п_хр_.pdf'
 
 main(pdf_path)
