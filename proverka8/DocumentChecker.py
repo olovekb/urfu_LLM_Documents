@@ -5,7 +5,11 @@ from cv2.gapi import kernel
 from pdf2image import convert_from_path
 from Levenshtein import ratio
 from sklearn.cluster import DBSCAN
+from Comparison import main as compare_names_with_faiss
 from pathlib import Path
+
+import json
+
 
 def local_to_absolute_path(file_path):
     return str(Path(file_path).resolve())
@@ -18,11 +22,12 @@ def check_empty_array_elements(array):
 
 # Сравнение с использованием эмбеддингов напрямую
 def compare_names_with_embeddings(threshold=0.6):
-    print('Шаг 3 Анализ блоков \'Утверждаю\' и \'Согласовано\'')
+    #print('Шаг 3 Анализ блоков \'Утверждаю\' и \'Согласовано\'')
     pytesseract.pytesseract.tesseract_cmd = local_to_absolute_path('Libraries/Tesseract/tesseract.exe')
 
-    approve_arr = []
-    agreed_arr = []
+    approve_arr = [] # утверждено/утверждаю
+    agreed_arr = [] # согласовано 
+    
 
     #todo нужно сделать отсеивание элементов, если они идут спустя 4 пустых элемента массива
     for value in os.listdir(local_to_absolute_path('proverka8/data/change_image')):
@@ -32,61 +37,69 @@ def compare_names_with_embeddings(threshold=0.6):
         for iterator in range(len(data)):
             if 'утверждаю' in data['text'][iterator].lower().strip() or 'утверждено' in data['text'][iterator].lower().strip():
                 buffer = str(' '.join(data['text']))
-                print(f"\n{'='*50}\n"
-                    f"Текст внутри рамки: УТВЕРЖДЕНО/УТВЕРЖДАЮ\n"
-                    f"{'='*50}")
+                #print(f"\n{'='*50}\n"
+                    #f"Текст внутри рамки: УТВЕРЖДЕНО/УТВЕРЖДАЮ\n"
+                    #f"{'='*50}")
                 print(buffer)
                 approve_arr.append(buffer)
                 break
 
             elif 'согласов' in data['text'][iterator].lower().strip():
                 buffer = ' '.join(data['text'][iterator:])
-                print(f"\n{'='*50}\n"
-                    f"Текст внутри рамки: СОГЛАСОВАНО\n"
-                    f"{'='*50}")
+                print("\n")
+                #print(f"\n{'='*50}\n"
+                   # f"Текст внутри рамки: СОГЛАСОВАНО\n"
+                    #f"{'='*50}")
                 print(buffer)
                 agreed_arr.append(buffer)
                 break
+    #print('Шаг 4 Подготовка результатов')            
+    # if approve_arr and agreed_arr:
+    #         '''
+    #         МОЖНО ДОДЕЛАТЬ, ЕСЛИ ПРИШЛО НЕСКОЛЬКО УТВЕРЖДАЮ И СОГЛАСОВАНО
+            
+    #         if approve_arr and agreed_arr:
+    #         if len(approve_arr) > 1:
+    #             print('Обнаружено больше 1-го наименования УТВЕРЖДАЮ')
+    #             for i in range(len(approve_arr) - 1):
 
-    print('Шаг 4 Подготовка результатов')
-    if approve_arr and agreed_arr:
-        '''
-        МОЖНО ДОДЕЛАТЬ, ЕСЛИ ПРИШЛО НЕСКОЛЬКО УТВЕРЖДАЮ И СОГЛАСОВАНО
-        
-        if approve_arr and agreed_arr:
-        if len(approve_arr) > 1:
-            print('Обнаружено больше 1-го наименования УТВЕРЖДАЮ')
-            for i in range(len(approve_arr) - 1):
+    #                 if similarity >= threshold:
+    #                     print(f"Наименования не совпадают (различия: {similarity:.2f})")
+    #                 else:
+    #                     print(f"Наименования совпадают (различия: {similarity:.2f})")
 
-                if similarity >= threshold:
-                    print(f"Наименования не совпадают (различия: {similarity:.2f})")
-                else:
-                    print(f"Наименования совпадают (различия: {similarity:.2f})")
+    #         if len(agreed_arr) > 1:
+    #             print('Обнаружено больше 1-го наименования СОГЛАСОВАНО')
+    #             for i in range(len(agreed_arr) - 1):
 
-        if len(agreed_arr) > 1:
-            print('Обнаружено больше 1-го наименования СОГЛАСОВАНО')
-            for i in range(len(agreed_arr) - 1):
+    #                 if similarity >= threshold:
+    #                     print(f"Наименования не совпадают (различия: {similarity:.2f})")
+    #                 else:
+    #                     print(f"Наименования совпадают (различия: {similarity:.2f})")
+    #         '''
+    #         if len(agreed_arr) == 1 and len(approve_arr) == 1:
+    #             similarity = ratio(approve_arr[0], agreed_arr[0])
 
-                if similarity >= threshold:
-                    print(f"Наименования не совпадают (различия: {similarity:.2f})")
-                else:
-                    print(f"Наименования совпадают (различия: {similarity:.2f})")
-        '''
-        if len(agreed_arr) == 1 and len(approve_arr) == 1:
-            similarity = ratio(approve_arr[0], agreed_arr[0])
+    #             if similarity <= threshold:
+    #                 print('\n' * 2 + f"ВНИМАНИЕ!\nНизкий процент совпадения текста - проверьте документ на правильность заполнения! (схожесть: {similarity:.2f})")
+    #             else:
+    #                 print('\n' * 2+ f"Наименования совпадают (схожесть: {similarity:.2f})")
+    #         else:
+    #             print('\n' * 2 + 'Внимание!\nОбнаружено больше одного блока текста \"Согласовано\" или \"Утверждаю\"')
+    # else:
+    #     print("Ошибка!\nНаименования не найдены!")
 
-            if similarity <= threshold:
-                print('\n' * 2 + f"ВНИМАНИЕ!\nНизкий процент совпадения текста - проверьте документ на правильность заполнения! (схожесть: {similarity:.2f})")
-            else:
-                print('\n' * 2+ f"Наименования совпадают (схожесть: {similarity:.2f})")
-        else:
-            print('\n' * 2 + 'Внимание!\nОбнаружено больше одного блока текста \"Согласовано\" или \"Утверждаю\"')
-    else:
-        print("Ошибка!\nНаименования не найдены!")
+    data = {
+        "approve_arr": approve_arr,
+        "agreed_arr": agreed_arr
+    }
+    
+    with open('proverka8/data/BlockNames.json', 'w', encoding='utf-8') as f:
+        json.dump(data, f, ensure_ascii=False, indent=4)
 
 #Преобразование pdf к jpg
 def convert_PDF_to_image(file_path, save_image_path = local_to_absolute_path('proverka8/data/pdf_images'), poppler_path = local_to_absolute_path('urfu_LLM_documents/Libraries/poppler-24.08.0/Library/bin')):
-    print('Шаг 1 Конвертация pdf к изображению...')
+    #print('Шаг 1 Конвертация pdf к изображению...')
     os.environ["PATH"] += os.pathsep + poppler_path
     images = convert_from_path(file_path)
 
@@ -114,7 +127,7 @@ def delete_file_in_folder():
 
 #Анализ страницы
 def get_text_blocks(images_path = local_to_absolute_path('proverka8/data/pdf_images')):
-    print('Шаг 2 Подготовка к обработке изображения')
+    #print('Шаг 2 Подготовка к обработке изображения')
     pytesseract.pytesseract.tesseract_cmd = local_to_absolute_path('Libraries/Tesseract/tesseract.exe')
 
     page_counter = 0
@@ -161,7 +174,7 @@ def get_text_blocks(images_path = local_to_absolute_path('proverka8/data/pdf_ima
                     centers.append([cx, cy])
 
         if not centers:
-            print("Обработка в процессе...")
+            #print("Обработка в процессе...")
             continue
 
         # Кластеризация по координатам центров
@@ -196,7 +209,7 @@ def get_text_blocks(images_path = local_to_absolute_path('proverka8/data/pdf_ima
             for iterator in range(len(cropped_image_data['text'])):
                 if 'утверждаю' in cropped_image_data['text'][iterator].lower().strip() or 'утверждено' in cropped_image_data['text'][iterator].lower().strip() or 'согласов' in cropped_image_data['text'][iterator].lower().strip():
                     cv2.imwrite(f'{local_to_absolute_path('proverka8/data/change_image')}\\cropped_image_{page_counter}.jpg', cropped_image)
-                    print(f'Добавлен файл {local_to_absolute_path('proverka8/data/change_image')}\\cropped_image_{page_counter}.jpg')
+                    #print(f'Добавлен файл {local_to_absolute_path('proverka8/data/change_image')}\\cropped_image_{page_counter}.jpg')
 
 
 
@@ -205,12 +218,13 @@ def get_text_blocks(images_path = local_to_absolute_path('proverka8/data/pdf_ima
 def main(pdf_path):
     delete_file_in_folder()
     convert_PDF_to_image(pdf_path)
-    print(f'Images successfully converted from {pdf_path}')
+    #print(f'Изображения успешно конвертированы из {pdf_path}')
     get_text_blocks()
-    print(f'Обработка завершена!')
+    #print(f'Обработка завершена!')
     compare_names_with_embeddings()
+    compare_names_with_faiss() # - запускает функцию main из файла Comparison.py
 
 # Запуск
-pdf_path = r'G:/Python/urfu_LLM_documents/proverka8/data/СП_16_Магнит_отдел_Выборы_Гос_Дума_2016_оп_2_п_хр_.pdf'
+pdf_path = r'G:/Python/urfu_LLM_documents/proverka8/data/Агаповский_архив,_КСП,_ф_79,_оп_2_л_с_за_2022_год (2).pdf'
 
 main(pdf_path)
