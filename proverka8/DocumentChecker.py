@@ -161,7 +161,7 @@ def get_text_blocks(images_path = local_to_absolute_path('proverka8/data/pdf_ima
                     centers.append([cx, cy])
 
         if not centers:
-            #print("Обработка в процессе...")
+            print("Обработка в процессе...")
             continue
 
         # Кластеризация по координатам центров
