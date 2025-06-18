@@ -7,7 +7,6 @@ from Levenshtein import ratio
 from sklearn.cluster import DBSCAN
 from Comparison import main as compare_names_with_faiss
 from pathlib import Path
-
 import json
 
 
@@ -53,41 +52,6 @@ def compare_names_with_embeddings(threshold=0.6):
                 print(buffer)
                 agreed_arr.append(buffer)
                 break
-    #print('Шаг 4 Подготовка результатов')            
-    # if approve_arr and agreed_arr:
-    #         '''
-    #         МОЖНО ДОДЕЛАТЬ, ЕСЛИ ПРИШЛО НЕСКОЛЬКО УТВЕРЖДАЮ И СОГЛАСОВАНО
-            
-    #         if approve_arr and agreed_arr:
-    #         if len(approve_arr) > 1:
-    #             print('Обнаружено больше 1-го наименования УТВЕРЖДАЮ')
-    #             for i in range(len(approve_arr) - 1):
-
-    #                 if similarity >= threshold:
-    #                     print(f"Наименования не совпадают (различия: {similarity:.2f})")
-    #                 else:
-    #                     print(f"Наименования совпадают (различия: {similarity:.2f})")
-
-    #         if len(agreed_arr) > 1:
-    #             print('Обнаружено больше 1-го наименования СОГЛАСОВАНО')
-    #             for i in range(len(agreed_arr) - 1):
-
-    #                 if similarity >= threshold:
-    #                     print(f"Наименования не совпадают (различия: {similarity:.2f})")
-    #                 else:
-    #                     print(f"Наименования совпадают (различия: {similarity:.2f})")
-    #         '''
-    #         if len(agreed_arr) == 1 and len(approve_arr) == 1:
-    #             similarity = ratio(approve_arr[0], agreed_arr[0])
-
-    #             if similarity <= threshold:
-    #                 print('\n' * 2 + f"ВНИМАНИЕ!\nНизкий процент совпадения текста - проверьте документ на правильность заполнения! (схожесть: {similarity:.2f})")
-    #             else:
-    #                 print('\n' * 2+ f"Наименования совпадают (схожесть: {similarity:.2f})")
-    #         else:
-    #             print('\n' * 2 + 'Внимание!\nОбнаружено больше одного блока текста \"Согласовано\" или \"Утверждаю\"')
-    # else:
-    #     print("Ошибка!\nНаименования не найдены!")
 
     data = {
         "approve_arr": approve_arr,
@@ -159,15 +123,17 @@ def get_text_blocks(images_path = local_to_absolute_path('proverka8/data/pdf_ima
                 left_arr[1] = int(data['left'][iterator])
                 top_arr[1] = int(data['top'][iterator])
 
+            # Для ширины удаление от края
             if flag_arr[0]:
-                if int(data['conf'][iterator]) > 80 and flag_arr[0] and data['text'][iterator] != None and (left_arr[0] - 250 <= data['left'][iterator] or left_arr[0] + 250 >= data['left'][iterator]) and (top_arr[0] - 250 <= data['top'][iterator] and top_arr[0] + 250 >= data['top'][iterator]):
+                if int(data['conf'][iterator]) > 80 and data['text'][iterator] != None and (left_arr[0] - 250 <= data['left'][iterator] or left_arr[0] + 250 >= data['left'][iterator]) and (top_arr[0] - 250 <= data['top'][iterator] and top_arr[0] + 250 >= data['top'][iterator]):
                     x, y, w, h = data['left'][iterator], data['top'][iterator], data['width'][iterator], data['height'][iterator]
                     cx, cy = x + w // 2, y + h // 2
                     boxes.append((x, y, w, h))
                     centers.append([cx, cy])
 
+            # Для высоты удаление от края
             if flag_arr[1]:
-                if int(data['conf'][iterator]) > 80 and flag_arr[1] and data['text'][iterator] != None and (left_arr[1] - 250 <= data['left'][iterator] or left_arr[1] + 250 >= data['left'][iterator]) and (top_arr[1] - 250 <= data['top'][iterator] and top_arr[1] + 250 >= data['top'][iterator]):
+                if int(data['conf'][iterator]) > 80 and data['text'][iterator] != None and (left_arr[1] - 250 <= data['left'][iterator] or left_arr[1] + 250 >= data['left'][iterator]) and (top_arr[1] - 250 <= data['top'][iterator] and top_arr[1] + 250 >= data['top'][iterator]):
                     x, y, w, h = data['left'][iterator], data['top'][iterator], data['width'][iterator], data['height'][iterator]
                     cx, cy = x + w // 2, y + h // 2
                     boxes.append((x, y, w, h))
@@ -224,7 +190,3 @@ def main(pdf_path):
     compare_names_with_embeddings()
     compare_names_with_faiss() # - запускает функцию main из файла Comparison.py
 
-# Запуск
-pdf_path = r'G:/Python/urfu_LLM_documents/proverka8/data/Агаповский_архив,_КСП,_ф_79,_оп_2_л_с_за_2022_год (2).pdf'
-
-main(pdf_path)
