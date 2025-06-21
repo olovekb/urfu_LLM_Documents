@@ -3,7 +3,6 @@ import pytesseract
 import os
 from cv2.gapi import kernel
 from pdf2image import convert_from_path
-from Levenshtein import ratio
 from sklearn.cluster import DBSCAN
 from Comparison import main as compare_names_with_faiss
 from pathlib import Path
