@@ -9,7 +9,7 @@ def local_to_absolute_path(file_path):
     return str(Path(file_path).resolve())
 
 # Преобразование pdf к jpg
-def convert_PDF_to_image(file_path, save_image_path = local_to_absolute_path('lama 3.1/proverka8/data/pdf_images'), poppler_path = local_to_absolute_path('urfu_LLM_Documents/lama 3.1/poppler-24.08.0/Library/bin')): 
+def convert_PDF_to_image(file_path, save_image_path = local_to_absolute_path('proverka8/data/pdf_images'), poppler_path = local_to_absolute_path('urfu_LLM_documents/Libraries/poppler-24.08.0/Library/bi')): 
     print('Шаг 1 Конвертация pdf к изображению...')
     os.environ["PATH"] += os.pathsep + poppler_path
     images = convert_from_path(file_path)
@@ -18,10 +18,10 @@ def convert_PDF_to_image(file_path, save_image_path = local_to_absolute_path('la
         image.save(f'{save_image_path}\\page_{i}.jpg', 'JPEG')
 
 # Построение таблицы
-def build_table(images_path = local_to_absolute_path('lama 3.1/proverka8/data/pdf_images')):
+def build_table(images_path = local_to_absolute_path('proverka8/data/pdf_images')):
 
     for iterator in range(1, len(os.listdir(images_path)) + 1):
-        image_path = local_to_absolute_path('lama 3.1/proverka8/data/pdf_images') + f'\\page_{iterator}.jpg'
+        image_path = local_to_absolute_path('proverka8/data/pdf_images') + f'\\page_{iterator}.jpg'
         image = cv2.imread(image_path)
         
         # Проверка, что изображение успешно загружено
@@ -69,18 +69,18 @@ def build_table(images_path = local_to_absolute_path('lama 3.1/proverka8/data/pd
             for y in range(top, bottom, row_height):
                 cv2.line(image, (left, y), (right, y), (0, 0, 0), 2)
 
-            cv2.imwrite(local_to_absolute_path('lama 3.1/proverka8/change_image') + f'\\result_image_{iterator}.jpg', image)
+            cv2.imwrite(local_to_absolute_path('proverka8/change_image') + f'\\result_image_{iterator}.jpg', image)
 
 # Удаление файлов из всех папок
 def delete_file_in_folder():
     folders_to_delete = [
-        r'G:\Python\urfu_LLM_documents\lama 3.1\proverka8\change_image',
-        r'G:\Python\urfu_LLM_documents\lama 3.1\proverka8\gray_image',
-        r'G:\Python\urfu_LLM_documents\lama 3.1\proverka8\blur_image',
-        r'G:\Python\urfu_LLM_documents\lama 3.1\proverka8\threshold_image',
-        r'G:\Python\urfu_LLM_documents\lama 3.1\proverka8\kernal_image',
-        r'G:\Python\urfu_LLM_documents\lama 3.1\proverka8\dilate_image',
-        r'G:\Python\urfu_LLM_documents\lama 3.1\proverka8\bbox_image'
+        r'G:\Python\urfu_LLM_documents\proverka8\change_image',
+        r'G:\Python\urfu_LLM_documents\proverka8\gray_image',
+        r'G:\Python\urfu_LLM_documents\proverka8\blur_image',
+        r'G:\Python\urfu_LLM_documents\proverka8\threshold_image',
+        r'G:\Python\urfu_LLM_documents\proverka8\kernal_image',
+        r'G:\Python\urfu_LLM_documents\proverka8\dilate_image',
+        r'G:\Python\urfu_LLM_documents\proverka8\bbox_image'
     ]
 
     for folder in folders_to_delete:
@@ -100,8 +100,8 @@ def delete_file_in_folder():
 
 # Преобразование всех изображений в серые
 def convert_to_gray():
-    image_folder = local_to_absolute_path(r'G:\Python\urfu_LLM_documents\lama 3.1\proverka8\change_image')
-    gray_folder = local_to_absolute_path(r'G:\Python\urfu_LLM_documents\lama 3.1\proverka8\gray_image')
+    image_folder = local_to_absolute_path(r'G:\Python\urfu_LLM_documents\proverka8\change_image')
+    gray_folder = local_to_absolute_path(r'G:\Python\urfu_LLM_documents\proverka8\gray_image')
     
     # Проходим по изображениям в папке change_image и конвертируем их в серые
     for filename in os.listdir(image_folder):
@@ -117,8 +117,8 @@ def convert_to_gray():
 
 # Применение размытия к изображениям
 def apply_gaussian_blur():
-    gray_folder = local_to_absolute_path(r'G:\Python\urfu_LLM_documents\lama 3.1\proverka8\gray_image')
-    blur_folder = local_to_absolute_path(r'G:\Python\urfu_LLM_documents\lama 3.1\proverka8\blur_image')
+    gray_folder = local_to_absolute_path(r'G:\Python\urfu_LLM_documents\proverka8\gray_image')
+    blur_folder = local_to_absolute_path(r'G:\Python\urfu_LLM_documents\proverka8\blur_image')
     
     # Проходим по изображениям в папке gray_image и применяем размытие
     for filename in os.listdir(gray_folder):
@@ -134,8 +134,8 @@ def apply_gaussian_blur():
 
 # Применение пороговой обработки
 def apply_threshold():
-    blur_folder = local_to_absolute_path(r'G:\Python\urfu_LLM_documents\lama 3.1\proverka8\blur_image')
-    threshold_folder = local_to_absolute_path(r'G:\Python\urfu_LLM_documents\lama 3.1\proverka8\threshold_image')
+    blur_folder = local_to_absolute_path(r'G:\Python\urfu_LLM_documents\proverka8\blur_image')
+    threshold_folder = local_to_absolute_path(r'G:\Python\urfu_LLM_documents\proverka8\threshold_image')
     
     # Проходим по изображениям в папке blur_image и применяем пороговую обработку
     for filename in os.listdir(blur_folder):
@@ -157,8 +157,8 @@ def apply_threshold():
 
 # Применение техники морфологического преобразования (kernal)
 def apply_kernal():
-    threshold_folder = local_to_absolute_path(r'G:\Python\urfu_LLM_documents\lama 3.1\proverka8\threshold_image')
-    kernal_folder = local_to_absolute_path(r'G:\Python\urfu_LLM_documents\lama 3.1\proverka8\kernal_image')
+    threshold_folder = local_to_absolute_path(r'G:\Python\urfu_LLM_documents\proverka8\threshold_image')
+    kernal_folder = local_to_absolute_path(r'G:\Python\urfu_LLM_documents\proverka8\kernal_image')
     
     # Создаем ядро для морфологической операции
     kernal = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 13))
@@ -176,8 +176,8 @@ def apply_kernal():
 
 # Применение техники dilate
 def apply_dilate():
-    threshold_folder = local_to_absolute_path(r'G:\Python\urfu_LLM_documents\lama 3.1\proverka8\threshold_image')
-    dilate_folder = local_to_absolute_path(r'G:\Python\urfu_LLM_documents\lama 3.1\proverka8\dilate_image')
+    threshold_folder = local_to_absolute_path(r'G:\Python\urfu_LLM_documents\proverka8\threshold_image')
+    dilate_folder = local_to_absolute_path(r'G:\Python\urfu_LLM_documents\proverka8\dilate_image')
     
     # Создаем ядро для dilate
     kernal = cv2.getStructuringElement(cv2.MORPH_RECT, (10, 30))
@@ -196,9 +196,9 @@ def apply_dilate():
             cv2.imwrite(dilate_path, dilate)
             print(f"Сохранено изображение с dilate: {dilate_path}")
 
-def build_table_after_preprocessing(images_path = local_to_absolute_path('lama 3.1/proverka8/dilate_image')):
-    bbox_image_folder = r'G:\Python\urfu_LLM_documents\lama 3.1\proverka8\bbox_image'
-    change_image_folder = r'G:\Python\urfu_LLM_documents\lama 3.1\proverka8\change_image'  # Папка с исходными изображениями
+def build_table_after_preprocessing(images_path = local_to_absolute_path('proverka8/dilate_image')):
+    bbox_image_folder = r'G:\Python\urfu_LLM_documents\proverka8\bbox_image'
+    change_image_folder = r'G:\Python\urfu_LLM_documents\proverka8\change_image'  # Папка с исходными изображениями
 
     for iterator in range(1, len(os.listdir(images_path)) + 1):
         dilate_path = os.path.join(images_path, f'result_image_{iterator}.jpg')
@@ -247,7 +247,7 @@ def build_table_after_preprocessing(images_path = local_to_absolute_path('lama 3
 
 def main():
     delete_file_in_folder()  # Удаляем файлы из всех папок
-    pdf_path = r'G:\Python\urfu_LLM_documents\lama 3.1\proverka8\data\pdf_images\Кунашак, КРК, оп 1, п.хр. (3).pdf'  # Укажите путь к своему PDF
+    pdf_path = r'G:\Python\urfu_LLM_documents\proverka8\data\pdf_images\Кунашак, КРК, оп 1, п.хр. (3).pdf'  # Укажите путь к своему PDF
     convert_PDF_to_image(pdf_path)
     build_table()
     convert_to_gray()  # Преобразуем все изображения в серые
