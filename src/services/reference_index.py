@@ -7,8 +7,8 @@ import pandas as pd
 import numpy as np
 import faiss
 from sentence_transformers import SentenceTransformer
-from ..config.config import CONFIG
-from ..utils.text_normalizer import TextNormalizer
+from config.config import CONFIG
+from src.utilities.text_normalizer import TextNormalizer
 
 logger = logging.getLogger(__name__)
 
@@ -59,8 +59,16 @@ class ReferenceIndex:
                 )
                 cache_files = {"archive": archive_cache, "organization": org_cache}
 
+            # Предварительно нормализуем тексты для повышения производительности
+            archives = [
+                TextNormalizer.normalize(archive) for archive in df["Архив"].tolist()
+            ]
+            normalized_organizations = [
+                TextNormalizer.normalize_organization(org)
+                for org in df["Наименование"].tolist()
+            ]
+
             # Генерируем эмбеддинги для архивов
-            archives = df["Архив"].tolist()
             logger.info("Генерация эмбеддингов для архивов...")
             archive_embeddings = self._get_or_create_embeddings(
                 archives, "archive", cache_files, force_rebuild
@@ -68,11 +76,6 @@ class ReferenceIndex:
             self.archive_index = self._build_faiss_index(archive_embeddings)
 
             # Генерируем эмбеддинги для организаций
-            organizations = df["Наименование"].tolist()
-            # Нормализуем названия организаций (удаляем цифры, сохраняем точки и запятые)
-            normalized_organizations = [
-                TextNormalizer.normalize_organization(org) for org in organizations
-            ]
             logger.info("Генерация эмбеддингов для организаций...")
             organization_embeddings = self._get_or_create_embeddings(
                 normalized_organizations, "organization", cache_files, force_rebuild
@@ -145,9 +148,12 @@ class ReferenceIndex:
         Returns:
             Массив эмбеддингов
         """
+        # Используем batch_size для оптимальной производительности
+        batch_size = min(CONFIG["batch_size"], len(texts))
+
         embeddings = self.model.encode(
             texts,
-            batch_size=CONFIG["batch_size"],
+            batch_size=batch_size,
             show_progress_bar=True,
             convert_to_tensor=False,
         )
@@ -163,6 +169,7 @@ class ReferenceIndex:
         Returns:
             FAISS индекс
         """
+        # Используем IndexFlatIP для точного поиска по внутреннему произведению (косинусное сходство)
         index = faiss.IndexFlatIP(embeddings.shape[1])
         index.add(embeddings)
         return index
@@ -180,13 +187,25 @@ class ReferenceIndex:
         Returns:
             Кортеж (расстояния, индексы)
         """
+        # Нормализуем текст запроса в зависимости от типа индекса
+        if index_type == "archive":
+            query = TextNormalizer.normalize(query)
+        elif index_type == "organization":
+            query = TextNormalizer.normalize_organization(query)
+
+        # Выбираем нужный индекс
         index = (
             self.archive_index if index_type == "archive" else self.organization_index
         )
+
+        # Создаем эмбеддинг для запроса
         query_embedding = self.model.encode(query)
         query_embedding = np.expand_dims(query_embedding, axis=0)
         faiss.normalize_L2(query_embedding)
-        return index.search(query_embedding, top_k)
+
+        # Выполняем поиск
+        distances, indices = index.search(query_embedding, top_k)
+        return distances, indices
 
     def save_embeddings(self, directory: str, prefix: str = ""):
         """Сохраняет эмбеддинги в указанную директорию.
@@ -198,35 +217,17 @@ class ReferenceIndex:
         os.makedirs(directory, exist_ok=True)
 
         if self.archive_index:
+            archive_embeddings = faiss.vector_to_array(
+                self.archive_index.get_xb()
+            ).reshape(self.archive_index.ntotal, self.archive_index.d)
             archive_path = os.path.join(directory, f"{prefix}archive_embeddings.npy")
-            # Для извлечения эмбеддингов из индекса FAISS используем метод с нулевым запросом
-            # Этот подход работает для IndexFlatIP, который хранит все эмбеддинги
-            n_vectors = self.archive_index.ntotal
-            d = self.archive_index.d
-            embeddings = np.zeros((n_vectors, d), dtype=np.float32)
-
-            # Извлекаем данные из индекса
-            for i in range(n_vectors):
-                # Метод reconstruct извлекает вектор по его индексу
-                vector = np.zeros(d, dtype=np.float32)
-                self.archive_index.reconstruct(i, vector)
-                embeddings[i] = vector
-
-            np.save(archive_path, embeddings)
-            logger.info(f"Эмбеддинги архивов сохранены в {archive_path}")
+            logger.info(f"Сохранение эмбеддингов архивов в {archive_path}")
+            np.save(archive_path, archive_embeddings)
 
         if self.organization_index:
+            org_embeddings = faiss.vector_to_array(
+                self.organization_index.get_xb()
+            ).reshape(self.organization_index.ntotal, self.organization_index.d)
             org_path = os.path.join(directory, f"{prefix}organization_embeddings.npy")
-            # Для извлечения эмбеддингов из индекса FAISS используем метод с нулевым запросом
-            n_vectors = self.organization_index.ntotal
-            d = self.organization_index.d
-            embeddings = np.zeros((n_vectors, d), dtype=np.float32)
-
-            # Извлекаем данные из индекса
-            for i in range(n_vectors):
-                vector = np.zeros(d, dtype=np.float32)
-                self.organization_index.reconstruct(i, vector)
-                embeddings[i] = vector
-
-            np.save(org_path, embeddings)
-            logger.info(f"Эмбеддинги организаций сохранены в {org_path}")
+            logger.info(f"Сохранение эмбеддингов организаций в {org_path}")
+            np.save(org_path, org_embeddings)
