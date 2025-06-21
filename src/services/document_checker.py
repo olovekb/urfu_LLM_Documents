@@ -2,6 +2,8 @@
 
 import logging
 import os
+
+
 from typing import List, Dict, Optional, Tuple
 from sentence_transformers import SentenceTransformer
 from src.services.pdf_parser import PDFParser

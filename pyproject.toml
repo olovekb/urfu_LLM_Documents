@@ -13,10 +13,13 @@ authors = [
 ]
 dependencies = [
     "sentence-transformers >= 2.2.2",
-    "numpy >= 1.24.0",
+    "numpy>=1.24,<2.0",
     "pandas >= 1.5.0",
     "PyMuPDF >= 1.21.0",
     "faiss-cpu >= 1.7.4",
+    "streamlit>=1.40.1",
+    "torch==2.0.1",
+    "transformers>=4.39.0",
 ]
 
 [project.optional-dependencies]
@@ -40,7 +43,7 @@ select = ["E", "F", "I", "N", "W", "D", "B", "C4"]
 ignore = ["D203", "D213"]
 
 [tool.ruff.isort]
-known-first-party = ["document_checker"]
+known-first-party = ["src"]
 
 [tool.ruff.pydocstyle]
 convention = "google"
@@ -51,4 +54,7 @@ target-version = ["py38"]
 include = '\.pyi?$'
 
 [project.scripts]
-document-checker = "src.main:main" 
+document-checker = "src.main:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src"] 

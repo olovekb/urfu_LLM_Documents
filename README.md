@@ -64,18 +64,23 @@ git clone https://github.com/your-username/document-checker.git
 cd document-checker
 ```
 
-2. Создайте виртуальное окружение и активируйте его:
+2. Подготовьте окружение (рекомендуемый способ):
 ```bash
-python -m venv .venv
-# Windows
-.venv\Scripts\activate
-# Linux/Mac
-source .venv/bin/activate
-```
+# однократно установите Python 3.8 (при необходимости)
+uv python install 3.8
 
-3. Установите зависимости:
+# создайте/обновите виртуальное окружение и установите зависимости
+uv sync
+```
+`uv sync` автоматически:
+* выбирает интерпретатор, закреплённый в `.python-version` (`3.8`);
+* создаёт каталог `.venv`;
+* устанавливает точные версии пакетов из `uv.lock`.
+
+3. Альтернативный способ (pip):
 ```bash
-uv pip install -e .
+python -m venv .venv && source .venv/bin/activate
+pip install -r requirements.lock.txt
 ```
 
 ## Использование
@@ -119,7 +124,15 @@ python -m src.main --force_rebuild
 - `Архив`: Название архивного отдела
 - `Наименование`: Наименование организации
 
+## Запуск Streamlit-приложения
 
+# Подготовка окружения (если ещё не выполнена)
+uv sync  # создаст .venv под Python 3.8 и установит зависимости
+source .venv/bin/activate  # Windows: .venv\Scripts\activate
+
+# Запуск Web-UI
+streamlit run src/stream_app.py
+```
 
 ## Технологический стек
 
@@ -127,6 +140,50 @@ python -m src.main --force_rebuild
 - **sentence-transformers**, **FAISS**, **PyMuPDF**, **NumPy**, **Pandas**
 - **uv** — управление зависимостями и виртуальной средой
 - ***Ruff**, **Black** — линтинг, форматирование
+
+## Используемая языковая модель
+
+> Эта секция описывает, какая модель "большого" языкового пространства применяется, где она задаётся
+> и как обеспечивается её наличие на локальной машине.
+
+### Какая модель используется?
+
+По умолчанию проект работает с мульти-языковой моделью [**`paraphrase-multilingual-MiniLM-L12-v2`**](https://huggingface.co/sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2). Её название задаётся в конфигурационном файле:
+
+```3:8:config/config.py
+CONFIG = {
+    "model_name": "paraphrase-multilingual-MiniLM-L12-v2",
+    ...
+}
+```
+
+### Как скачивается модель?
+
+Библиотека [`sentence-transformers`](https://www.sbert.net/) автоматически загружает модель при первом обращении и кэширует её в каталоге `~/.cache/sentence-transformers` (можно переопределить переменной окружения `SENTENCE_TRANSFORMERS_HOME`). Поэтому дополнительных шагов для установки модели не требуется — достаточно интернет-доступа при первом запуске.
+
+### Режим офлайн / предзагрузка
+
+Если требуется работать без доступа в сеть, скачайте модель заранее:
+
+```bash
+huggingface-cli download sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2 --local-dir ~/.cache/sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2
+```
+
+Либо установите собственный путь к кэшу:
+
+```bash
+export SENTENCE_TRANSFORMERS_HOME="/path/to/models_cache"  # Windows: setx SENTENCE_TRANSFORMERS_HOME "C:\models_cache"
+```
+
+### Как сменить модель?
+
+1. Отредактируйте значение `model_name` в `config/config.py`,
+2. (Опционально) добавьте чтение переменной окружения, например:
+   ```python
+   import os
+   MODEL_NAME = os.getenv("MODEL_NAME", CONFIG["model_name"])
+   ```
+3. Запустите проект — новая модель будет автоматически загружена и закэширована.
 
 ## Статус проекта
 
