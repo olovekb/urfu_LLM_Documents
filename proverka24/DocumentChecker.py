@@ -278,7 +278,7 @@ def build_table_after_preprocessing(images_path = local_to_absolute_path('dilate
 
         cropped_image_folder = local_to_absolute_path(r'cropped_image')
 
-        # Рисование прямоугольников для каждого контура на исходном изображении
+        # Обрезание прямоугольников по условию
         for c in cnts:
             x, y, w, h = cv2.boundingRect(c) 
             if w > 120 and h > 40 and w < 1500 and h < 3000:  # Фильтрация по размерам столбцов
