@@ -2,7 +2,11 @@
 
 import logging
 import os
+import re
 
+import numpy as np
+import faiss
+import torch
 
 from typing import List, Dict, Optional, Tuple
 from sentence_transformers import SentenceTransformer
@@ -42,7 +46,9 @@ class DocumentChecker:
         """
         try:
             logger.info(f"Инициализация модели: {model_name}")
-            device = "cpu"  # Используем CPU для стабильности
+            # Определяем устройство: GPU (cuda) если доступно, иначе CPU
+            device = "cuda" if torch.cuda.is_available() else "cpu"
+            logger.info(f"Выбрано устройство для модели: {device}")
             model = SentenceTransformer(model_name, device=device)
             logger.info("Модель успешно инициализирована")
             return model
@@ -99,6 +105,141 @@ class DocumentChecker:
             # Нормализуем название организации
             pdf_org_normalized = TextNormalizer.normalize_organization(pdf_org)
             logger.info(f"Нормализованное название организации: {pdf_org_normalized}")
+
+            # -------------------------------------------------------------
+            # Определяем, нужно ли игнорировать сравнение по архиву. Если
+            # извлечённый текст архива не содержит слова, начинающегося на
+            # «архив» (архив, архивный, архивного ...), считаем, что архив
+            # определить не удалось и выполняем поиск ТОЛЬКО по организации.
+            # -------------------------------------------------------------
+            ignore_archive = not bool(re.search(r"(?i)\bархив\w*", pdf_archive))
+
+            if ignore_archive:
+                logger.info(
+                    "В извлечённом значении архива отсутствует слово 'архив*' — пропускаю сравнение архива"
+                )
+
+                # Сначала пытаемся найти точное совпадение по организации
+                exact_results = []
+                for record in self.reference_index.reference_data:
+                    org_text = TextNormalizer.normalize_organization(record["Наименование"])
+                    if org_text == pdf_org_normalized:
+                        exact_results.append(
+                            {
+                                "archive_match": {
+                                    "text": record["Архив"],
+                                    "similarity": None,
+                                },
+                                "organization_match": {
+                                    "text": record["Наименование"],
+                                    "similarity": 1.0,
+                                },
+                                "avg_similarity": 1.0,
+                                "is_exact": True,
+                                "archive_ignored": True,
+                            }
+                        )
+
+                if exact_results:
+                    logger.info("Найдено точное совпадение по организации — архив возвращён из справочника")
+                    return exact_results
+
+                # Если точного совпадения нет, используем семантический поиск только по организации
+                distances, indices = self.reference_index.search(
+                    pdf_org_normalized, "organization", top_k=10
+                )
+
+                logger.info("Топ-5 совпадений по организациям (archive ignored):")
+                for i in range(min(5, len(indices[0]))):
+                    idx = indices[0][i]
+                    org_name = self.reference_index.reference_data[idx]["Наименование"]
+                    similarity = distances[0][i]
+                    logger.info(f"{i+1}. {org_name} - {similarity:.4f}")
+
+                results = []
+                for i, idx in enumerate(indices[0]):
+                    if distances[0][i] < CONFIG["threshold"]:
+                        continue
+                    results.append(
+                        {
+                            "archive_match": {
+                                "text": self.reference_index.reference_data[idx]["Архив"],
+                                "similarity": None,
+                            },
+                            "organization_match": {
+                                "text": self.reference_index.reference_data[idx]["Наименование"],
+                                "similarity": float(distances[0][i]),
+                            },
+                            "avg_similarity": float(distances[0][i]),
+                            "is_exact": False,
+                            "archive_ignored": True,
+                        }
+                    )
+
+                # Сортируем и ограничиваем top-N
+                if results:
+                    results.sort(key=lambda x: x["avg_similarity"], reverse=True)
+                    desired_top_n = CONFIG.get("top_n_results", 5)
+                    return results[:desired_top_n]
+
+                # Если ничего не найдено
+                logger.warning("Семантический поиск по организации не дал результатов")
+                return []
+
+            # -------------------------------------------------------------
+            # Если архив присутствует, пробуем парный поиск (архив+организация)
+            # -------------------------------------------------------------
+
+            logger.info("Выполняю семантический поиск по парному индексу (архив+организация)")
+
+            pair_query = f"{TextNormalizer.normalize(pdf_archive)}; {pdf_org_normalized}"
+
+            pair_distances, pair_indices = self.reference_index.search(
+                pair_query, "pair", top_k=10
+            )
+
+            results = []
+
+            logger.info("Топ-5 совпадений по паре архив+организация:")
+            for i in range(min(5, len(pair_indices[0]))):
+                idx = pair_indices[0][i]
+                rec = self.reference_index.reference_data[idx]
+                sim = pair_distances[0][i]
+                logger.info(
+                    f"{i+1}. {rec['Архив']} | {rec['Наименование']} - {sim:.4f}"
+                )
+
+            # Фильтрация по порогу
+            for i, idx in enumerate(pair_indices[0]):
+                sim = pair_distances[0][i]
+                if sim < CONFIG["threshold"]:
+                    continue
+
+                rec = self.reference_index.reference_data[idx]
+                results.append(
+                    {
+                        "archive_match": {
+                            "text": rec["Архив"],
+                            "similarity": float(sim),
+                        },
+                        "organization_match": {
+                            "text": rec["Наименование"],
+                            "similarity": float(sim),
+                        },
+                        "avg_similarity": float(sim),
+                        "is_exact": False,
+                        "archive_ignored": False,
+                        "pair_search": True,
+                    }
+                )
+
+            # Если получили удовлетворительные результаты — возвращаем top-N
+            if results:
+                results.sort(key=lambda x: x["avg_similarity"], reverse=True)
+                desired_top_n = CONFIG.get("top_n_results", 5)
+                return results[:desired_top_n]
+
+            # Если парный поиск не дал результатов, fallback на старую логику ниже.
 
             # Создаем временное хранилище для результатов
             results = []
@@ -388,3 +529,29 @@ class DocumentChecker:
         except Exception as e:
             logger.error(f"Ошибка при поиске совпадений: {e}", exc_info=True)
             return []
+
+    # ------------------------------------------------------------------
+    # Вспомогательные методы отладки
+    # ------------------------------------------------------------------
+    def debug_similarity(self, text1: str, text2: str) -> float:
+        """Вычисляет косинусную схожесть между двумя строками.
+
+        Args:
+            text1: Первая строка
+            text2: Вторая строка
+
+        Returns:
+            Косинусная схожесть (от 0 до 1).
+        """
+        if not text1 or not text2:
+            logger.warning("Одна из строк для debug_similarity пуста — возвращаю 0.0")
+            return 0.0
+
+        embeddings = self.model.encode([text1, text2], convert_to_tensor=False)
+        embeddings = np.asarray(embeddings, dtype=np.float32)
+        faiss.normalize_L2(embeddings)
+        similarity = float(np.dot(embeddings[0], embeddings[1]))
+        logger.info(
+            f"Debug similarity между '{text1[:50]}...' и '{text2[:50]}...' = {similarity:.4f}"
+        )
+        return similarity

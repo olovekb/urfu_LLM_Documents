@@ -21,6 +21,7 @@ class ReferenceIndex:
         self.reference_data = []
         self.archive_index = None
         self.organization_index = None
+        self.pair_index = None  # Новый индекс для пары архив+организация
 
     def build_index(
         self, csv_path: str, cache_dir: str = None, force_rebuild: bool = False
@@ -57,7 +58,14 @@ class ReferenceIndex:
                 org_cache = os.path.join(
                     cache_dir, f"{csv_name}_organization_embeddings.npy"
                 )
-                cache_files = {"archive": archive_cache, "organization": org_cache}
+                pair_cache = os.path.join(
+                    cache_dir, f"{csv_name}_pair_embeddings.npy"
+                )
+                cache_files = {
+                    "archive": archive_cache,
+                    "organization": org_cache,
+                    "pair": pair_cache,
+                }
 
             # Предварительно нормализуем тексты для повышения производительности
             archives = [
@@ -81,6 +89,18 @@ class ReferenceIndex:
                 normalized_organizations, "organization", cache_files, force_rebuild
             )
             self.organization_index = self._build_faiss_index(organization_embeddings)
+
+            # -------------------------------------------------------------
+            # Генерируем эмбеддинги для пары «архив; организация»
+            # -------------------------------------------------------------
+            logger.info("Генерация эмбеддингов для пар архив+организация...")
+            pair_texts = [
+                f"{a}; {o}" for a, o in zip(archives, normalized_organizations)
+            ]
+            pair_embeddings = self._get_or_create_embeddings(
+                pair_texts, "pair", cache_files, force_rebuild
+            )
+            self.pair_index = self._build_faiss_index(pair_embeddings)
 
             logger.info(f"Индексация завершена. Обработано {len(df)} записей")
 
@@ -113,13 +133,23 @@ class ReferenceIndex:
                 try:
                     logger.info(f"Загрузка эмбеддингов из кэша: {cache_path}")
                     embeddings = np.load(cache_path)
-                    # Проверка размерности кэша
-                    if len(embeddings) == len(texts):
+                    # -----------------------------------------------------------------
+                    # Дополнительная валидация кэша: сверяем количество строк, размерность
+                    # и dtype. Если что-то не совпадает, игнорируем кэш и создаём заново.
+                    # -----------------------------------------------------------------
+                    expected_dim = self.model.get_sentence_embedding_dimension()
+                    if (
+                        len(embeddings) == len(texts)
+                        and embeddings.ndim == 2
+                        and embeddings.shape[1] == expected_dim
+                    ):
                         logger.info(f"Эмбеддинги успешно загружены из кэша")
-                        return embeddings
+                        return embeddings.astype(np.float32, copy=False)
                     else:
                         logger.warning(
-                            f"Размерность кэшированных эмбеддингов не совпадает: {len(embeddings)} != {len(texts)}"
+                            "Кэшованные эмбеддинги не прошли валидацию: "
+                            f"rows={len(embeddings)} (ожидалось {len(texts)}), "
+                            f"dim={embeddings.shape[1] if embeddings.ndim==2 else 'N/A'} (ожидалось {expected_dim})"
                         )
                 except Exception as e:
                     logger.warning(f"Ошибка при загрузке кэша эмбеддингов: {e}")
@@ -148,15 +178,40 @@ class ReferenceIndex:
         Returns:
             Массив эмбеддингов
         """
+        # Если список пустой, сразу возвращаем пустой массив корректной формы
+        if not texts:
+            logger.warning("Получен пустой список текстов — возвращаю пустой массив эмбеддингов")
+            dim = self.model.get_sentence_embedding_dimension()
+            return np.empty((0, dim), dtype=np.float32)
+
         # Используем batch_size для оптимальной производительности
         batch_size = min(CONFIG["batch_size"], len(texts))
 
-        embeddings = self.model.encode(
-            texts,
-            batch_size=batch_size,
-            show_progress_bar=True,
-            convert_to_tensor=False,
-        )
+        # Используем multiprocessing, если работаем на CPU и есть несколько ядер
+        if self.model.device.type == "cpu" and (os.cpu_count() or 1) > 1:
+            logger.info(
+                "GPU не найден. Использую multiprocessing для ускорения кодирования"
+            )
+            pool = self.model.start_multi_process_pool()
+            try:
+                embeddings = self.model.encode_multi_process(
+                    texts,
+                    pool,
+                    batch_size=batch_size,
+                    normalize_embeddings=False,
+                )
+            finally:
+                self.model.stop_multi_process_pool(pool)
+        else:
+            embeddings = self.model.encode(
+                texts,
+                batch_size=batch_size,
+                show_progress_bar=True,
+                convert_to_tensor=False,
+            )
+
+        # Приводим к numpy.float32 для совместимости с FAISS
+        embeddings = np.asarray(embeddings, dtype=np.float32)
         faiss.normalize_L2(embeddings)
         return embeddings
 
@@ -192,11 +247,17 @@ class ReferenceIndex:
             query = TextNormalizer.normalize(query)
         elif index_type == "organization":
             query = TextNormalizer.normalize_organization(query)
+        elif index_type == "pair":
+            # Для пары предполагается, что строка уже объединена и нормализована ранее
+            pass
 
         # Выбираем нужный индекс
-        index = (
-            self.archive_index if index_type == "archive" else self.organization_index
-        )
+        if index_type == "archive":
+            index = self.archive_index
+        elif index_type == "organization":
+            index = self.organization_index
+        else:
+            index = self.pair_index
 
         # Создаем эмбеддинг для запроса
         query_embedding = self.model.encode(query)
@@ -231,3 +292,11 @@ class ReferenceIndex:
             org_path = os.path.join(directory, f"{prefix}organization_embeddings.npy")
             logger.info(f"Сохранение эмбеддингов организаций в {org_path}")
             np.save(org_path, org_embeddings)
+
+        if self.pair_index:
+            pair_embeddings = faiss.vector_to_array(
+                self.pair_index.get_xb()
+            ).reshape(self.pair_index.ntotal, self.pair_index.d)
+            pair_path = os.path.join(directory, f"{prefix}pair_embeddings.npy")
+            logger.info(f"Сохранение эмбеддингов пар в {pair_path}")
+            np.save(pair_path, pair_embeddings)

@@ -2,6 +2,7 @@
 
 import logging
 import os
+import re
 from typing import Optional, Tuple, List, Dict, Any
 import fitz
 from src.utilities.text_normalizer import TextNormalizer
@@ -40,54 +41,119 @@ class PDFParser:
                     logger.info("Извлечение данных из первой страницы")
 
                     try:
-                        # Извлекаем текст из блоков
-                        blocks_data = first_page.get_text("dict")
-                        blocks_text = self._extract_blocks_text(blocks_data)
+                        # ---------- 1. Извлекаем полный текст и блоки ----------
+                        full_text: str = first_page.get_text("text") or ""
 
-                        if not blocks_text or len(blocks_text) == 0:
-                            logger.error(
-                                "Не удалось извлечь блоки текста из первой страницы"
-                            )
-                            return None
+                        blocks_data = first_page.get_text("dict")
+                        block_lines = self._extract_blocks_text(blocks_data)
 
                         if self.debug_mode:
-                            debug_file = f"{pdf_path}_blocks_debug.txt"
+                            debug_file = f"{pdf_path}_page1_debug.txt"
                             with open(debug_file, "w", encoding="utf-8") as f:
-                                for i, text in enumerate(blocks_text):
-                                    f.write(f"--- Блок {i+1} ---\n{text}\n\n")
-                            logger.info(f"Тексты блоков сохранены в {debug_file}")
-
-                        # Первый блок - архив, блоки 2-5 (если есть) - организация
-                        if len(blocks_text) >= 1:
-                            archive_value = blocks_text[0]
+                                f.write(full_text)
                             logger.info(
-                                f"Первый блок (архив): {archive_value[:100]}..."
+                                f"Текст первой страницы сохранён в {debug_file}"
                             )
-                        else:
-                            logger.error("Не найден блок для архива")
+
+                        # Разбиваем полный текст на предложения (простое правило)
+                        sentence_split_pattern = r"(?<=[.!?])\s+(?=[A-ZА-ЯЁ])"
+                        sentences = re.split(sentence_split_pattern, full_text.strip())
+                        sentences = [s.strip() for s in sentences if s.strip()]
+
+                        # ---------- 2. Формируем кандидаты в порядке появления ----------
+                        candidates: List[str] = []
+                        candidates.extend(block_lines)
+                        for sent in sentences:
+                            if sent not in candidates:
+                                candidates.append(sent)
+
+                        if not candidates:
+                            logger.error("Не удалось получить кандидаты строк для анализа")
                             return None
 
-                        # Объединяем блоки 2-5 (или сколько есть) для организации
-                        org_blocks = blocks_text[1:] if len(blocks_text) > 1 else []
-                        if org_blocks:
-                            org_value = " ".join(org_blocks)
-                            logger.info(f"Блоки организации: {org_value[:100]}...")
-                        else:
-                            logger.warning("Не найдены блоки для организации")
-                            org_value = ""
+                        # ---------- 3. Функция скоринга для архива ----------
+                        def score_archive(line: str) -> int:
+                            l = line.lower()
+                            score = 0
+                            if re.search(r"\bархив\w*", l):
+                                score += 3
+                            if re.search(r"(отдел|управл|муниципаль|городск)", l):
+                                score += 1
+                            if re.search(r"(фонд|опись|дел|год)", l):
+                                score -= 1
+                            if len(l) > 200:
+                                score -= 1
+                            return score
 
-                        # Нормализуем значения
-                        archive_value = TextNormalizer.normalize(archive_value)
-                        org_value = TextNormalizer.normalize_organization(org_value)
+                        # ---------- 4. Определяем архив ----------
+                        best_idx = -1
+                        best_score = -999
+                        for idx, line in enumerate(candidates):
+                            sc = score_archive(line)
+                            if sc > best_score:
+                                best_score = sc
+                                best_idx = idx
 
-                        logger.info(f"Извлеченный архив: {archive_value}")
-                        logger.info(f"Извлеченная организация: {org_value}")
+                        archive_value = ""
+                        archive_idx = -1
+                        if best_score >= 2 and best_idx != -1:
+                            archive_value = candidates[best_idx]
+                            archive_idx = best_idx
 
-                        return archive_value, org_value
+                        # ---------- 5. Определяем организацию ----------
+                        negative_org = re.compile(r"(фонд|опись|дел|год)", re.IGNORECASE)
+                        org_value = ""
+
+                        start_search = archive_idx + 1 if archive_idx != -1 else 0
+                        i_ptr = start_search
+                        while i_ptr < len(candidates):
+                            cand = candidates[i_ptr]
+                            if len(cand) < 20:
+                                i_ptr += 1
+                                continue
+                            if negative_org.search(cand):
+                                i_ptr += 1
+                                continue
+                            if re.search(r"\bархив\w*", cand, re.IGNORECASE):
+                                i_ptr += 1
+                                continue
+
+                            # базовая строка организации
+                            org_value = cand
+
+                            # Попробуем «прицепить» 1-2 следующие строки, если они служебные продолжения
+                            look_ahead = 1
+                            while look_ahead <= 2 and (i_ptr + look_ahead) < len(candidates):
+                                next_cand = candidates[i_ptr + look_ahead]
+                                if (
+                                    len(next_cand) < 15
+                                    or negative_org.search(next_cand)
+                                    or re.search(r"\bархив\w*", next_cand, re.IGNORECASE)
+                                ):
+                                    break
+                                # Добавляем, если в сумме не превышаем 250 символов
+                                if len(org_value) + len(next_cand) < 250:
+                                    org_value = f"{org_value} {next_cand}"
+                                    look_ahead += 1
+                                else:
+                                    break
+                            break
+                        # end while loop
+
+                        # ---------- 6. Нормализация ----------
+                        archive_norm = TextNormalizer.normalize(archive_value) if archive_value else ""
+                        org_norm = TextNormalizer.normalize_organization(org_value)
+
+                        logger.info(
+                            f"Извлечённый архив: {archive_norm if archive_norm else '[игнорирован]'}"
+                        )
+                        logger.info(f"Извлечённая организация: {org_norm}")
+
+                        return archive_norm, org_norm
 
                     except Exception as e:
                         logger.error(
-                            f"Ошибка при извлечении блоков текста: {e}", exc_info=True
+                            f"Ошибка при извлечении текста первой страницы: {e}", exc_info=True
                         )
                         return None
                 else:

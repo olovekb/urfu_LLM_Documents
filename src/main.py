@@ -111,7 +111,13 @@ def process_document(
                 {
                     "archive": m["archive_match"]["text"],
                     "organization": m["organization_match"]["text"],
-                    "similarity": round(m["avg_similarity"], 2),
+                    "similarity_pair": round(m["avg_similarity"], 2),
+                    "similarity_archive": None
+                    if m["archive_match"].get("similarity") is None
+                    else round(m["archive_match"]["similarity"], 2),
+                    "similarity_org": None
+                    if m["organization_match"].get("similarity") is None
+                    else round(m["organization_match"]["similarity"], 2),
                     "is_exact": m.get("is_exact", False),
                     "is_potential": m.get("is_potential", False),
                 }
