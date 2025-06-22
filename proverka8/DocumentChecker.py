@@ -80,7 +80,9 @@ def delete_file_in_folder():
         r'G:\Python\urfu_LLM_documents\proverka8\threshold_image',
         r'G:\Python\urfu_LLM_documents\proverka8\kernal_image',
         r'G:\Python\urfu_LLM_documents\proverka8\dilate_image',
-        r'G:\Python\urfu_LLM_documents\proverka8\bbox_image'
+        r'G:\Python\urfu_LLM_documents\proverka8\bbox_image',
+        r'G:\Python\urfu_LLM_documents\proverka8\cropped_image'
+
     ]
 
     for folder in folders_to_delete:
@@ -125,7 +127,7 @@ def apply_gaussian_blur():
         if filename.endswith(".jpg"):
             img_path = os.path.join(gray_folder, filename)
             image = cv2.imread(img_path)
-            blurred_image = cv2.GaussianBlur(image, (9, 9), 0)  # Применение размытия
+            blurred_image = cv2.GaussianBlur(image, (7, 7), 0)  # Применение размытия
             
             # Сохраняем результат в папке blur_image
             blur_path = os.path.join(blur_folder, filename)
@@ -180,7 +182,7 @@ def apply_dilate():
     dilate_folder = local_to_absolute_path(r'G:\Python\urfu_LLM_documents\proverka8\dilate_image')
     
     # Создаем ядро для dilate
-    kernal = cv2.getStructuringElement(cv2.MORPH_RECT, (10, 30))
+    kernal = cv2.getStructuringElement(cv2.MORPH_RECT, (9, 27))
     
     # Проходим по изображениям в папке threshold_image и применяем dilate
     for filename in os.listdir(threshold_folder):
@@ -198,7 +200,9 @@ def apply_dilate():
 
 def build_table_after_preprocessing(images_path = local_to_absolute_path('proverka8/dilate_image')):
     bbox_image_folder = r'G:\Python\urfu_LLM_documents\proverka8\bbox_image'
-    change_image_folder = r'G:\Python\urfu_LLM_documents\proverka8\change_image'  # Папка с исходными изображениями
+    change_image_folder = r'G:\Python\urfu_LLM_documents\proverka8\change_image'  
+    сropped_image_folder = r'G:\Python\urfu_LLM_documents\proverka8\cropped_image'  
+
 
     for iterator in range(1, len(os.listdir(images_path)) + 1):
         dilate_path = os.path.join(images_path, f'result_image_{iterator}.jpg')
@@ -234,11 +238,17 @@ def build_table_after_preprocessing(images_path = local_to_absolute_path('prover
         cnts = sorted(cnts, key=lambda x: cv2.boundingRect(x)[0])
 
         # Рисование прямоугольников для каждого контура на исходном изображении
+        cropped_image_folder = local_to_absolute_path(r'G:\Python\urfu_LLM_documents\proverka8\cropped_image')
+
         for c in cnts:
             x, y, w, h = cv2.boundingRect(c)
-            if w > 80 and h > 30:  # Фильтрация по размерам столбцов
+            if w > 150 and h > 250:  # Фильтрация по размерам столбцов
+                roi = image[y:y+h, x:x+h]
+                cropped_image_path = os.path.join(cropped_image_folder, f"cropped_image_{iterator}.jpg")
+                cv2.imwrite(cropped_image_path, roi)
+                print(f"Сохранено обрезанное изображение: {cropped_image_path}")
                 cv2.rectangle(image, (x, y), (x + w, y + h), (36, 255, 12), 2)
-
+            
         # Сохранение изображения с прямоугольниками
         result_image_path = os.path.join(bbox_image_folder, f'result_image_{iterator}.jpg')
         cv2.imwrite(result_image_path, image)
