@@ -4,13 +4,43 @@ import os
 from cv2.gapi import kernel
 from pdf2image import convert_from_path
 from sklearn.cluster import DBSCAN
-from Comparison import main as compare_names_with_faiss
+from .Comparison import main as compare_names_with_faiss
 from pathlib import Path
 import json
 
+# -----------------------------------------------------------------------------
+# Пути по проекту
+# -----------------------------------------------------------------------------
 
-def local_to_absolute_path(file_path):
-    return str(Path(file_path).resolve())
+# Корень рабочего пространства (папка, содержащая директории src, data и т.д.)
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+# Единая директория для хранения временных файлов проверки N8
+DATA_DIR = PROJECT_ROOT / "data"
+# Убеждаемся, что необходимые подпапки существуют
+for _sub in ("pdf_images", "change_image"):
+    (DATA_DIR / _sub).mkdir(parents=True, exist_ok=True)
+
+# -----------------------------------------------------------------------------
+# Универсальный перевод относительных путей в абсолютные
+# -----------------------------------------------------------------------------
+
+def local_to_absolute_path(file_path: str) -> str:  # noqa: D401
+    """Преобразовать относительный путь к абсолютному внутри проекта.
+
+    1. Принимает как абсолютные, так и относительные пути.
+    2. Если путь начинается с "proverka8/data", он переписывается на "data".
+    3. Конкатенирует с корнем проекта и нормализует.
+    """
+
+    # Переписываем старый префикс
+    if file_path.startswith("proverka8/data"):
+        file_path = file_path.replace("proverka8/data", "data", 1)
+
+    path_obj = Path(file_path)
+    if not path_obj.is_absolute():
+        path_obj = PROJECT_ROOT / path_obj
+
+    return str(path_obj.resolve())
 
 def check_empty_array_elements(array):
     for i in range(len(array)):
@@ -57,7 +87,7 @@ def compare_names_with_embeddings(threshold=0.6):
         "agreed_arr": agreed_arr
     }
     
-    with open('proverka8/data/BlockNames.json', 'w', encoding='utf-8') as f:
+    with open(DATA_DIR / 'BlockNames.json', 'w', encoding='utf-8') as f:
         json.dump(data, f, ensure_ascii=False, indent=4)
 
 #Преобразование pdf к jpg

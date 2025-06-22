@@ -90,7 +90,9 @@ def process_document(
         best_match = matches[0]
 
         # Проверяем, является ли оно точным
-        if best_match.get("is_exact", False):
+        is_exact_flag = best_match.get("is_exact", False) or best_match.get("avg_similarity", 0) >= 0.9
+
+        if is_exact_flag:
             # Сохраняем только самое точное совпадение в упрощенном формате
             result["exact_match"] = {
                 "archive": best_match["archive_match"]["text"],
@@ -118,7 +120,7 @@ def process_document(
                     "similarity_org": None
                     if m["organization_match"].get("similarity") is None
                     else round(m["organization_match"]["similarity"], 2),
-                    "is_exact": m.get("is_exact", False),
+                    "is_exact": m.get("is_exact", False) or m.get("avg_similarity", 0) >= 0.9,
                     "is_potential": m.get("is_potential", False),
                 }
             )

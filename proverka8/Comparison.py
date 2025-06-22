@@ -4,6 +4,10 @@ from sentence_transformers import SentenceTransformer
 import faiss
 import numpy as np
 from Levenshtein import ratio
+from pathlib import Path
+
+# Единая директория данных (совпадает с DocumentChecker)
+DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 
 # Фильтрация наименований
 def filter_names(names):
@@ -21,7 +25,7 @@ def filter_names(names):
 
 # Загружаем наименования из файла
 def load_names_from_file():
-    with open('proverka8/data/BlockNames.json', 'r', encoding='utf-8') as f:
+    with open(DATA_DIR / 'BlockNames.json', 'r', encoding='utf-8') as f:
         data = json.load(f)
     return data["approve_arr"], data["agreed_arr"]
 

@@ -1,5 +1,6 @@
 import os
-
+import contextlib
+import io
 
 import json
 import tempfile
@@ -64,15 +65,20 @@ def save_uploaded_file(uploaded_file) -> str:
 
 
 # --------------------------------------------------------------------------------------
+# Настройка приложения (выполняется один раз)
+# --------------------------------------------------------------------------------------
+
+st.set_page_config(page_title="Инспектор документов", page_icon="📑", layout="wide")
+
+# --------------------------------------------------------------------------------------
 # Пользовательский интерфейс
 # --------------------------------------------------------------------------------------
 
 
 def main() -> None:  # noqa: D401
-    """Точка входа в Streamlit-приложение."""
+    """Страница проверки N2 (Document Inspector)."""
 
-    st.set_page_config(page_title="Document Inspector", page_icon="📄", layout="wide")
-    st.title("📄 Document Inspector")
+    st.title("📄 Document Inspector (Проверка N2)")
     st.write(
         "Проверка PDF-документов по справочнику с использованием SentenceTransformer."
     )
@@ -196,9 +202,12 @@ def main() -> None:  # noqa: D401
             # ===== 2. Обзорная таблица =====
             overview_data = []
             for r in results:
-                similarity = (
-                    r["exact_match"].get("similarity") if r.get("exact_match") else "-"
-                )
+                if r.get("exact_match"):
+                    similarity = r["exact_match"].get("similarity")
+                elif r.get("matches"):
+                    similarity = r["matches"][0].get("similarity_pair", "-")
+                else:
+                    similarity = "-"
                 overview_data.append(
                     {
                         "Файл": r["filename"],
@@ -211,12 +220,12 @@ def main() -> None:  # noqa: D401
             overview_df = pd.DataFrame(overview_data)
             st.dataframe(overview_df, use_container_width=True, hide_index=True)
 
-            # Переключатель показа JSON
-            show_json = st.checkbox("Показать детальный JSON для каждого документа")
+            # Детальный JSON отключён по требованию
+            show_json: bool = False
 
             # ===== 3. Детализация по документам =====
             for res in results:
-                with st.expander(f"�� {res['filename']}"):
+                with st.expander(f"📄 {res['filename']}"):
                     left_col, right_col = st.columns([1, 2])
 
                     # 3.1 Левая колонка – извлечение и точное совпадение
@@ -263,5 +272,116 @@ def main() -> None:  # noqa: D401
                 pass
 
 
-if __name__ == "__main__":
-    main()
+# --------------------------------------------------------------------------------------
+# Страница проверки N8 (OCR + сравнение подписей)
+# --------------------------------------------------------------------------------------
+
+
+def page_check_n8() -> None:  # noqa: D401
+    """UI-обёртка над логикой из ``proverka8.DocumentChecker`` (проверка N8)."""
+
+    import proverka8.DocumentChecker as dc  # локальный импорт, чтобы ускорить первую загрузку
+
+    st.title("🖼️ OCR & сравнение подписей (Проверка N8)")
+    st.write(
+        "Поиск блоков *Утверждено / Согласовано* в PDF и сверка наименований методом FAISS."
+    )
+
+    # ----------------------------
+    # Боковая панель настроек
+    # ----------------------------
+
+    st.sidebar.header("🛠️ Управление (N8)")
+
+    pdf_source = st.sidebar.radio(
+        "Источник PDF",
+        ("Загрузить файлы", "Директория на диске"),
+        key="n8_pdf_source",
+    )
+
+    uploaded_files = []
+    pdf_dir: str = ""
+    if pdf_source == "Загрузить файлы":
+        uploaded_files = st.sidebar.file_uploader(
+            "Выберите PDF",
+            type=["pdf"],
+            accept_multiple_files=True,
+            key="n8_uploader",
+        )
+    else:
+        default_dir = os.path.join(Path(__file__).resolve().parent.parent, "pdf_documents")
+        pdf_dir = st.sidebar.text_input(
+            "Путь к директории с PDF",
+            value=default_dir,
+            key="n8_pdf_dir",
+        )
+
+    run_btn = st.sidebar.button("🚀 Запустить обработку", key="n8_run_btn", use_container_width=True)
+
+    # ----------------------------
+    # Запуск обработки
+    # ----------------------------
+
+    if run_btn:
+        pdf_paths: list[str] = []
+        temp_files: list[str] = []
+
+        if pdf_source == "Загрузить файлы":
+            if not uploaded_files:
+                st.sidebar.error("Не выбраны файлы для загрузки.")
+                st.stop()
+            for uf in uploaded_files:
+                tmp_path = save_uploaded_file(uf)
+                temp_files.append(tmp_path)
+                pdf_paths.append(tmp_path)
+        else:
+            if not os.path.isdir(pdf_dir):
+                st.sidebar.error("Директория не найдена.")
+                st.stop()
+            pdf_paths = [
+                os.path.join(pdf_dir, f)
+                for f in os.listdir(pdf_dir)
+                if f.lower().endswith(".pdf")
+            ]
+            if not pdf_paths:
+                st.sidebar.error("В директории нет PDF-файлов.")
+                st.stop()
+
+        progress = st.progress(0, text="Обработка документов…")
+
+        for idx, pdf_path in enumerate(pdf_paths, start=1):
+            progress.progress(idx / len(pdf_paths), text=f"Обработка {idx}/{len(pdf_paths)}…")
+
+            buffer = io.StringIO()
+            with contextlib.redirect_stdout(buffer):
+                try:
+                    dc.main(pdf_path)
+                except Exception as exc:  # noqa: BLE001
+                    st.error(f"Ошибка при обработке {Path(pdf_path).name}: {exc}")
+                    continue
+
+            with st.expander(f"📄 {Path(pdf_path).name}"):
+                st.text_area("Консольный вывод", buffer.getvalue(), height=400)
+
+        progress.empty()
+
+        # Очистка временных файлов
+        for f in temp_files:
+            try:
+                os.remove(f)
+            except FileNotFoundError:
+                pass
+
+
+# --------------------------------------------------------------------------------------
+# Навигация между страницами
+# --------------------------------------------------------------------------------------
+
+
+pages = [
+    st.Page(main, title="Проверка N2", icon=":material/fact_check:", default=True),
+    st.Page(page_check_n8, title="Проверка N8", icon=":material/document_scanner:"),
+]
+
+_current_page = st.navigation(pages)
+_current_page.run()
