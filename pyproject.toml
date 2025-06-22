@@ -20,6 +20,7 @@ dependencies = [
     "streamlit>=1.40.1",
     "torch==2.0.1",
     "transformers>=4.39.0",
+    "mineru>=2.0.6",
 ]
 
 [project.optional-dependencies]
