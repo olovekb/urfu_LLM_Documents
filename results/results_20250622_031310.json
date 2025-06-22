@@ -1,0 +1,170 @@
+{
+    "date": "2025-06-22",
+    "documents": [
+        {
+            "filename": "В.Уфалей_КСП_Ф.117_Опись 1_2022.pdf",
+            "extracted_data": {
+                "archive": "Архивный Отдел Администрации Верхнеуфалейского Городского Округа",
+                "organization": "Контрольно Счетная Палата Верхнеуфалейского Городского Округа Г. Верхний Уфалей Челябинской Области"
+            },
+            "exact_match": null,
+            "matches": [
+                {
+                    "archive": "Архивный Отдел Администрации Г. Верхнего Уфалея Челябинской Области",
+                    "organization": "Контрольносчетная Палата Верхнеуфалейского Городского Округа Г. Верхний Уфалей",
+                    "similarity_pair": 0.98,
+                    "similarity_archive": 0.98,
+                    "similarity_org": 0.98,
+                    "is_exact": false,
+                    "is_potential": false
+                },
+                {
+                    "archive": "Архивный Отдел Администрации Верхнеуфалейского Городского Округа",
+                    "organization": "Администрация Силача Верхнеуфалейского городского округа п. Силач",
+                    "similarity_pair": 0.97,
+                    "similarity_archive": 0.97,
+                    "similarity_org": 0.97,
+                    "is_exact": false,
+                    "is_potential": false
+                },
+                {
+                    "archive": "Архивный Отдел Администрации Верхнеуфалейского Городского Округа",
+                    "organization": "Областное казенное учреждение Центр занятости населения города Верхнего Уфалея г. Верхний Уфалей",
+                    "similarity_pair": 0.97,
+                    "similarity_archive": 0.97,
+                    "similarity_org": 0.97,
+                    "is_exact": false,
+                    "is_potential": false
+                },
+                {
+                    "archive": "Архивный Отдел Администрации Верхнеуфалейского Городского Округа",
+                    "organization": "Администрация Нижнего Уфалея Верхнеуфалейского городского округа п. Нижний Уфалей",
+                    "similarity_pair": 0.96,
+                    "similarity_archive": 0.96,
+                    "similarity_org": 0.96,
+                    "is_exact": false,
+                    "is_potential": false
+                },
+                {
+                    "archive": "Архивный Отдел Администрации Г. Верхнего Уфалея Челябинской Области",
+                    "organization": "Верхнеуфалейский Городской Комитет Народного Контроля Г.Верхний Уфалей",
+                    "similarity_pair": 0.96,
+                    "similarity_archive": 0.96,
+                    "similarity_org": 0.96,
+                    "is_exact": false,
+                    "is_potential": false
+                }
+            ]
+        },
+        {
+            "filename": "Касли_Редакция_газеты_Красное_знамя_оп_5_лс_за_2021_год_2.pdf",
+            "extracted_data": {
+                "archive": "",
+                "organization": "Автономная Некоммерческая Организация Редакция Газеты Красное Знамя Ано Редакция Газеты Красное Знамя"
+            },
+            "exact_match": null,
+            "matches": [
+                {
+                    "archive": "Архивный Отдел Администрации Каслинского Муниципального Района",
+                    "organization": "Автономная некоммерческая организация Редакция газеты Красное знамя г. Касли",
+                    "similarity_pair": 0.93,
+                    "similarity_archive": null,
+                    "similarity_org": 0.93,
+                    "is_exact": false,
+                    "is_potential": false
+                },
+                {
+                    "archive": "Муниципальное Бюджетное Учреждение Миасский Окружной Архив",
+                    "organization": "Автономная Некоммерческая Организация Редакция Газеты Миасский Рабочий",
+                    "similarity_pair": 0.87,
+                    "similarity_archive": null,
+                    "similarity_org": 0.87,
+                    "is_exact": false,
+                    "is_potential": false
+                },
+                {
+                    "archive": "Архивный Отдел Администрации Кунашакского Муниципального Района",
+                    "organization": "Автономная некоммерческая организация Редакция газеты Знамя труда с. Кунашак",
+                    "similarity_pair": 0.86,
+                    "similarity_archive": null,
+                    "similarity_org": 0.86,
+                    "is_exact": false,
+                    "is_potential": false
+                },
+                {
+                    "archive": "Архивный Отдел Администрации Копейского Городского Округа Челябинской Области",
+                    "organization": "Автономная Некоммерческая Организация Редакция Газетыкопейский Рабочий",
+                    "similarity_pair": 0.86,
+                    "similarity_archive": null,
+                    "similarity_org": 0.86,
+                    "is_exact": false,
+                    "is_potential": false
+                },
+                {
+                    "archive": "Архивный Отдел Администрации Верхнеуфалейского Городского Округа",
+                    "organization": "Автономная некоммерческая организация Редакция газеты Уфалейский рабочий г. Верхний Уфалей",
+                    "similarity_pair": 0.85,
+                    "similarity_archive": null,
+                    "similarity_org": 0.85,
+                    "is_exact": false,
+                    "is_potential": false
+                }
+            ]
+        },
+        {
+            "filename": "Челябинск_Экономика_опись 1_пх (2).pdf",
+            "extracted_data": {
+                "archive": "Архивное Управление Администрации Города Челябинска",
+                "organization": "Управление По Стратегическомупланированию, Экономике И Инвестициям Администрации Города Челябинска Г. Челябинск Челябинской Области"
+            },
+            "exact_match": null,
+            "matches": [
+                {
+                    "archive": "Архивное Управление Администрации Города Челябинска",
+                    "organization": "Управление по стратегическому планированию экономике и инвестициям Администрации города Челябинска",
+                    "similarity_pair": 0.94,
+                    "similarity_archive": 0.94,
+                    "similarity_org": 0.94,
+                    "is_exact": false,
+                    "is_potential": false
+                },
+                {
+                    "archive": "Архивное Управление Администрации Города Челябинска",
+                    "organization": "Документы По Выборам Органов Исполнительной И Представительной Власти Всех Уровней На Территории Города Челябинска Г. Челябинск Челябинской Области",
+                    "similarity_pair": 0.94,
+                    "similarity_archive": 0.94,
+                    "similarity_org": 0.94,
+                    "is_exact": false,
+                    "is_potential": false
+                },
+                {
+                    "archive": "Архивное Управление Администрации Города Челябинска",
+                    "organization": "Администрация Тракторозаводского района города Челябинска",
+                    "similarity_pair": 0.94,
+                    "similarity_archive": 0.94,
+                    "similarity_org": 0.94,
+                    "is_exact": false,
+                    "is_potential": false
+                },
+                {
+                    "archive": "Архивное Управление Администрации Города Челябинска",
+                    "organization": "Челябинская городская Дума  г. Челябинск",
+                    "similarity_pair": 0.93,
+                    "similarity_archive": 0.93,
+                    "similarity_org": 0.93,
+                    "is_exact": false,
+                    "is_potential": false
+                },
+                {
+                    "archive": "Архивное Управление Администрации Города Челябинска",
+                    "organization": "Администрация Курчатовского района города Челябинска",
+                    "similarity_pair": 0.93,
+                    "similarity_archive": 0.93,
+                    "similarity_org": 0.93,
+                    "is_exact": false,
+                    "is_potential": false
+                }
+            ]
+        }
+    ]
+}

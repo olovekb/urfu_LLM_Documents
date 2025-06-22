@@ -27,7 +27,7 @@ def load_names_from_file():
 
 # Преобразуем наименования в эмбеддинги
 def create_embeddings(names):
-    model = SentenceTransformer('paraphrase-MiniLM-L6-v2')
+    model = SentenceTransformer('paraphrase-multilingual-MiniLM-L12-v2')
     return model.encode(names)
 
 # Применяем FAISS для сравнения

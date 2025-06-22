@@ -61,7 +61,11 @@ def compare_names_with_embeddings(threshold=0.6):
         json.dump(data, f, ensure_ascii=False, indent=4)
 
 #Преобразование pdf к jpg
-def convert_PDF_to_image(file_path, save_image_path = local_to_absolute_path('proverka8/data/pdf_images'), poppler_path = local_to_absolute_path('urfu_LLM_documents/Libraries/poppler-24.08.0/Library/bin')):
+def convert_PDF_to_image(
+    file_path,
+    save_image_path: str = local_to_absolute_path('proverka8/data/pdf_images'),
+    poppler_path: str = local_to_absolute_path('Libraries/poppler-24.08.0/Library/bin'),
+):
     #print('Шаг 1 Конвертация pdf к изображению...')
     os.environ["PATH"] += os.pathsep + poppler_path
     images = convert_from_path(file_path)
@@ -97,7 +101,7 @@ def get_text_blocks(images_path = local_to_absolute_path('proverka8/data/pdf_ima
 
     #Открываем контекст одной страницы
     for i in range(1, len(os.listdir(images_path)) + 1):
-        img = cv2.imread(f'{local_to_absolute_path('proverka8/data/pdf_images')}\\page_{i}.jpg')
+        img = cv2.imread(f"{local_to_absolute_path('proverka8/data/pdf_images')}\\page_{i}.jpg")
 
         data = pytesseract.image_to_data(img, lang='rus', output_type=pytesseract.Output.DICT)
 
@@ -173,7 +177,7 @@ def get_text_blocks(images_path = local_to_absolute_path('proverka8/data/pdf_ima
 
             for iterator in range(len(cropped_image_data['text'])):
                 if 'утверждаю' in cropped_image_data['text'][iterator].lower().strip() or 'утверждено' in cropped_image_data['text'][iterator].lower().strip() or 'согласов' in cropped_image_data['text'][iterator].lower().strip():
-                    cv2.imwrite(f'{local_to_absolute_path('proverka8/data/change_image')}\\cropped_image_{page_counter}.jpg', cropped_image)
+                    cv2.imwrite(f"{local_to_absolute_path('proverka8/data/change_image')}\\cropped_image_{page_counter}.jpg", cropped_image)
                     #print(f'Добавлен файл {local_to_absolute_path('proverka8/data/change_image')}\\cropped_image_{page_counter}.jpg')
 
 
